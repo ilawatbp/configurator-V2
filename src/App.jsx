@@ -1,11 +1,27 @@
+import { Routes, Route } from "react-router";
+
 import Sidebar from "./components/Sidebar";
-import Main from "./components/Main";
+
+// pages
+import StartPage from "./pages/StartPage";
+import Configuration3D from "./pages/Configuration3D";
+import MaterialSelection from "./pages/MaterialSelection";
+import PendantSelection from "./pages/PendantSelection";
+
 function App() {
 
   return (
       <div className="min-h-dvh w-full flex relative">
         <Sidebar />
-        <Main flex-1/>
+        
+        <main className="ml-18 flex-1">
+          <Routes>
+            <Route path="/" element={<StartPage />} />
+            <Route path="/penselect" element={<PendantSelection />} />
+            <Route path="/matselect" element={<MaterialSelection />} />
+            <Route path="/config" element={<Configuration3D />} />
+          </Routes>
+        </main>
       </div>
     )
 }
