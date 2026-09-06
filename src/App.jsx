@@ -1,7 +1,5 @@
 import { Routes, Route } from "react-router";
 
-import Sidebar from "./components/Sidebar";
-
 // pages
 import StartPage from "./pages/StartPage";
 import Configuration3D from "./pages/Configuration3D";
@@ -11,10 +9,8 @@ import PendantSelection from "./pages/PendantSelection";
 function App() {
 
   return (
-      <div className="min-h-dvh w-full flex relative">
-        <Sidebar />
-        
-        <main className="ml-18 flex-1">
+      <div className="min-h-dvh w-full flex relative">        
+        <main className="flex-1">
           <Routes>
             <Route path="/" element={<StartPage />} />
             <Route path="/penselect" element={<PendantSelection />} />

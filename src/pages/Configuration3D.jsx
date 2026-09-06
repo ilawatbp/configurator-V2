@@ -1,7 +1,12 @@
+import Sidebar from "../components/Sidebar"
+
 export default function Configuration3D(){
   return(
     <div>
-      3d
+      <Sidebar/>
+      <div>
+        asdfasdf
+      </div>
     </div>
     )
 }

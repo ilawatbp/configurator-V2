@@ -8,8 +8,7 @@ import modelList from "../assets/data";
 export default function MaterialSelection() {
   const navigate = useNavigate();
 
-  const { workingModel, setWorkingModel } =
-    useContext(ConfiguratorContext);
+  const { workingModel, setWorkingModel } = useContext(ConfiguratorContext);
 
   function selectSpecification(specName, value) {
     setWorkingModel((prev) => ({
@@ -18,9 +17,7 @@ export default function MaterialSelection() {
     }));
   }
 
-  const selectedModel = modelList.find(
-    (item) => item.id === workingModel.id
-  );
+  const selectedModel = modelList.find((item) => item.id === workingModel.id);
 
   return (
     <div className="w-full min-h-full px-6">
@@ -31,31 +28,21 @@ export default function MaterialSelection() {
       </div>
 
       <div className="max-w-6xl mx-auto">
-        <h1 className="text-3xl font-bold">
-          Material / Finish
-        </h1>
+        <h1 className="text-3xl font-bold">Material / Finish</h1>
 
-        <p className="mb-10">
-          {selectedModel?.name}
-        </p>
+        <p className="mb-10">{selectedModel?.name}</p>
 
-        {Object.entries(
-          selectedModel?.specification ?? {}
-        ).map(([specName, specValues]) => (
-          <div key={specName} className="mb-8">
+        {Object.entries(selectedModel?.specification ?? {}).map(
+          ([specName, specValues]) => (
+            <div key={specName} className="mb-8">
+              <h2 className="text-xl font-bold mb-3">{specName}</h2>
 
-            <h2 className="text-xl font-bold mb-3">
-              {specName}
-            </h2>
-
-            <div className="flex gap-3 flex-wrap">
-              {specValues.map((value) => (
-                <button
-                  key={value}
-                  onClick={() =>
-                    selectSpecification(specName, value)
-                  }
-                  className={`
+              <div className="flex gap-3 flex-wrap">
+                {specValues.map((value) => (
+                  <button
+                    key={value}
+                    onClick={() => selectSpecification(specName, value)}
+                    className={`
                     border rounded-xl px-4 py-2
                     transition-all duration-200
                     ${
@@ -64,13 +51,25 @@ export default function MaterialSelection() {
                         : "bg-white text-black border-gray-400 hover:bg-gray-100"
                     }
                   `}
-                >
-                  {value}
-                </button>
-              ))}
+                  >
+                    {value}
+                  </button>
+                ))}
+              </div>
             </div>
-          </div>
-        ))}
+          ),
+        )}
+      </div>
+
+      <div className="max-w-6xl mx-auto flex justify-end">
+        <button
+          className={`
+                    border rounded-xl px-4 py-2
+                    transition-all duration-200`}
+                    onClick={() => navigate("/config")}
+        >
+          Next
+        </button>
       </div>
     </div>
   );
