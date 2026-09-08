@@ -310,18 +310,31 @@ console.log("Model path:", modelPath);
       modelPath,
 
       (gltf) => {
-        const pendant = gltf.scene;
+  const pendant = gltf.scene;
 
-        pendant.position.set(
-          0,
-          compositionConfig.lowest,
-          0
-        );
+  pendant.updateMatrixWorld(true);
 
-        scene.add(pendant);
+  const box = new THREE.Box3().setFromObject(pendant);
 
-        pendantRef.current = pendant;
-      },
+  const size = new THREE.Vector3();
+  box.getSize(size);
+
+  console.log("Pendant GLB size:", {
+    width: size.x,
+    height: size.y,
+    depth: size.z,
+  });
+
+  pendant.position.set(
+    0,
+    80,
+    0
+  );
+
+  scene.add(pendant);
+
+  pendantRef.current = pendant;
+},
 
       undefined,
 
