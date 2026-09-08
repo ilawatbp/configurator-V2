@@ -6,6 +6,31 @@ import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js";
 import { ConfiguratorContext } from "../context/ConfiguratorContext";
 import modelList from "../assets/data";
 
+function disposeObject(object) {
+  object.traverse((child) => {
+    if (!child.isMesh) return;
+
+    child.geometry?.dispose();
+
+    const materials = Array.isArray(child.material)
+      ? child.material
+      : [child.material];
+
+    materials.forEach((material) => {
+      if (!material) return;
+
+      Object.values(material).forEach((value) => {
+        if (value?.isTexture) {
+          value.dispose();
+        }
+      });
+
+      material.dispose();
+    });
+  });
+}
+
+
 export default function ConfiguratorScene() {
   const containerRef = useRef(null);
 
@@ -17,6 +42,7 @@ export default function ConfiguratorScene() {
   const sceneRef = useRef(null);
   const baseplateRef = useRef(null);
   const pendantRef = useRef(null);
+  const lowestRef = useRef(compositionConfig.lowest);
 
   // =====================================================
   // CREATE THREE.JS SCENE
@@ -158,6 +184,7 @@ export default function ConfiguratorScene() {
       }
     };
   }, []);
+  
 
   // =====================================================
   // BASEPLATE
@@ -259,106 +286,149 @@ export default function ConfiguratorScene() {
     baseplateRef.current = baseplate;
 
   }, [
-    compositionConfig,
-    workingModel.surfaceShape,
-  ]);
+  compositionConfig.rows,
+  compositionConfig.cols,
+  compositionConfig.spacingL,
+  compositionConfig.spacingW,
+  compositionConfig.surfaceWidth,
+  compositionConfig.surfaceLength,
+  compositionConfig.surfaceHeight,
+  compositionConfig.baseOffset,
+  compositionConfig.circleSegments,
+  workingModel.surfaceShape,
+]);
 
-  // =====================================================
-  // LOAD ONE PENDANT
-  // =====================================================
-  useEffect(() => {
-    const scene = sceneRef.current;
+// =====================================================
+// LOAD ONE PENDANT
+// Reload ONLY when pendant or color changes
+// =====================================================
+useEffect(() => {
+  const scene = sceneRef.current;
 
-    if (!scene) return;
+  if (!scene) return;
 
-    const selectedModel = modelList.find(
-      (item) => item.id === workingModel.id
-    );
-
-    if (!selectedModel) return;
-
-    // Example:
-    // GL012A + orange
-    // -> /models/GL012Aorange.glb
-    const modelPath =
-      selectedModel.models?.[workingModel.color] ??
-      selectedModel.models?.default;
-
-      console.log("Selected ID:", workingModel.id);
-console.log("Selected color:", workingModel.color);
-console.log("Model path:", modelPath);
-
-    if (!modelPath) {
-      console.warn(
-        "No GLB found for selected configuration:",
-        workingModel.id,
-        workingModel.color
-      );
-
-      return;
-    }
-
-    // Remove previous pendant
-    if (pendantRef.current) {
-      scene.remove(pendantRef.current);
-      pendantRef.current = null;
-    }
-
-    const loader = new GLTFLoader();
-
-    loader.load(
-      modelPath,
-
-      (gltf) => {
-  const pendant = gltf.scene;
-
-  pendant.updateMatrixWorld(true);
-
-  const box = new THREE.Box3().setFromObject(pendant);
-
-  const size = new THREE.Vector3();
-  box.getSize(size);
-
-  console.log("Pendant GLB size:", {
-    width: size.x,
-    height: size.y,
-    depth: size.z,
-  });
-
-  pendant.position.set(
-    0,
-    80,
-    0
+  const selectedModel = modelList.find(
+    (item) => item.id === workingModel.id
   );
 
-  scene.add(pendant);
+  if (!selectedModel) return;
 
-  pendantRef.current = pendant;
-},
+  const modelPath =
+    selectedModel.models?.[workingModel.color] ??
+    selectedModel.models?.default;
 
-      undefined,
+  console.log("Selected ID:", workingModel.id);
+  console.log("Selected color:", workingModel.color);
+  console.log("Model path:", modelPath);
 
-      (error) => {
-        console.error(
-          "Error loading GLB:",
-          modelPath,
-          error
-        );
-      }
+  if (!modelPath) {
+    console.warn(
+      "No GLB found for selected configuration:",
+      workingModel.id,
+      workingModel.color
     );
 
-    return () => {
-      if (pendantRef.current) {
-        scene.remove(pendantRef.current);
-        pendantRef.current = null;
-      }
-    };
+    return;
+  }
 
-  }, [
-    workingModel.id,
-    workingModel.color,
-    compositionConfig.lowest,
-  ]);
+  // Remove old pendant
+  if (pendantRef.current) {
+    scene.remove(pendantRef.current);
+
+    disposeObject(pendantRef.current);
+
+    pendantRef.current = null;
+  }
+
+  const loader = new GLTFLoader();
+
+  let cancelled = false;
+
+  loader.load(
+    modelPath,
+
+    // SUCCESS
+    (gltf) => {
+      if (cancelled) {
+        disposeObject(gltf.scene);
+        return;
+      }
+
+      const pendant = gltf.scene;
+
+      pendant.updateMatrixWorld(true);
+
+      const box =
+        new THREE.Box3().setFromObject(pendant);
+
+      const size =
+        new THREE.Vector3();
+
+      box.getSize(size);
+
+      console.log("Pendant GLB size:", {
+        width: size.x,
+        height: size.y,
+        depth: size.z,
+      });
+
+      pendant.position.set(
+        0,
+        lowestRef.current,
+        0
+      );
+
+      scene.add(pendant);
+
+      pendantRef.current = pendant;
+    },
+
+    undefined,
+
+    // ERROR
+    (error) => {
+      if (cancelled) return;
+
+      console.error(
+        "Error loading GLB:",
+        modelPath,
+        error
+      );
+    }
+  );
+
+  // CLEANUP
+  return () => {
+    cancelled = true;
+
+    if (pendantRef.current) {
+      scene.remove(pendantRef.current);
+
+      disposeObject(pendantRef.current);
+
+      pendantRef.current = null;
+    }
+  };
+
+}, [
+  workingModel.id,
+  workingModel.color,
+]);
+
+  // =====================================================
+// PENDANT HEIGHT
+// Move existing pendant without reloading the GLB
+// =====================================================
+useEffect(() => {
+  lowestRef.current = compositionConfig.lowest;
+
+  const pendant = pendantRef.current;
+
+  if (!pendant) return;
+
+  pendant.position.y = compositionConfig.lowest;
+
+}, [compositionConfig.lowest]);
 
   return (
     <div
