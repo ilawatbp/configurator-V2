@@ -502,22 +502,18 @@ export default function ConfiguratorScene() {
     workingModel.color,
   ]);
 
-  // =====================================================
-  // PENDANT HEIGHT
-  // Move ALL pendants without reloading/recloning
-  // =====================================================
-  useEffect(() => {
-    pendantRefs.current.forEach(
-      (pendant) => {
-        pendant.position.y =
-          compositionConfig.lowest;
-      }
-    );
+// =====================================================
+// HEIGHT PATTERN SETTINGS
+// Recalculate pendant Y positions
+// =====================================================
+useEffect(() => {
+  rebuildPendantGrid();
 
-    updateAllCables();
-  }, [
-    compositionConfig.lowest,
-  ]);
+}, [
+  compositionConfig.lowest,
+  compositionConfig.highest,
+  compositionConfig.pattern,
+]);
 
   // =====================================================
   // BASEPLATE HEIGHT → UPDATE EXISTING CABLES
@@ -729,6 +725,383 @@ export default function ConfiguratorScene() {
   }
 
   // =====================================================
+// CALCULATE PENDANT HEIGHT
+// Step 4D - Height Pattern Engine
+// =====================================================
+function calculatePendantHeight({
+  rowIndex,
+  colIndex,
+  rows,
+  cols,
+  pattern,
+  lowest,
+  highest,
+}) {
+  const range =
+    highest - lowest;
+
+  switch (pattern) {
+
+    // ==================================================
+    // FLAT
+    // ==================================================
+    case "flat":
+      return lowest;
+
+
+    // ==================================================
+    // DIAGONAL
+    // ==================================================
+    case "diagonal": {
+      const maxStep =
+        (rows - 1) +
+        (cols - 1);
+
+      if (maxStep === 0) {
+        return lowest;
+      }
+
+      const currentStep =
+        rowIndex +
+        colIndex;
+
+      const progress =
+        currentStep /
+        maxStep;
+
+      return (
+        lowest +
+        range * progress
+      );
+    }
+
+
+    // ==================================================
+    // DOME
+    // Center = highest
+    // Outside = lowest
+    // ==================================================
+    case "dome": {
+      const centerRow =
+        (rows - 1) / 2;
+
+      const centerCol =
+        (cols - 1) / 2;
+
+      const rowOffset =
+        rowIndex - centerRow;
+
+      const colOffset =
+        colIndex - centerCol;
+
+      const maxRowOffset =
+        centerRow;
+
+      const maxColOffset =
+        centerCol;
+
+      const normalizedRow =
+        maxRowOffset > 0
+          ? rowOffset /
+            maxRowOffset
+          : 0;
+
+      const normalizedCol =
+        maxColOffset > 0
+          ? colOffset /
+            maxColOffset
+          : 0;
+
+      const distance =
+        Math.sqrt(
+          normalizedRow *
+            normalizedRow +
+          normalizedCol *
+            normalizedCol
+        );
+
+      const maxDistance =
+        Math.sqrt(
+          (rows > 1 ? 1 : 0) +
+          (cols > 1 ? 1 : 0)
+        );
+
+      if (maxDistance === 0) {
+        return highest;
+      }
+
+      const progress =
+        Math.min(
+          distance /
+            maxDistance,
+          1
+        );
+
+      return (
+        highest -
+        range * progress
+      );
+    }
+
+
+    // ==================================================
+    // REVERSE DOME
+    // Center = lowest
+    // Outside = highest
+    // ==================================================
+    case "reverseDome": {
+      const centerRow =
+        (rows - 1) / 2;
+
+      const centerCol =
+        (cols - 1) / 2;
+
+      const rowOffset =
+        rowIndex - centerRow;
+
+      const colOffset =
+        colIndex - centerCol;
+
+      const maxRowOffset =
+        centerRow;
+
+      const maxColOffset =
+        centerCol;
+
+      const normalizedRow =
+        maxRowOffset > 0
+          ? rowOffset /
+            maxRowOffset
+          : 0;
+
+      const normalizedCol =
+        maxColOffset > 0
+          ? colOffset /
+            maxColOffset
+          : 0;
+
+      const distance =
+        Math.sqrt(
+          normalizedRow *
+            normalizedRow +
+          normalizedCol *
+            normalizedCol
+        );
+
+      const maxDistance =
+        Math.sqrt(
+          (rows > 1 ? 1 : 0) +
+          (cols > 1 ? 1 : 0)
+        );
+
+      if (maxDistance === 0) {
+        return lowest;
+      }
+
+      const progress =
+        Math.min(
+          distance /
+            maxDistance,
+          1
+        );
+
+      return (
+        lowest +
+        range * progress
+      );
+    }
+
+
+    // ==================================================
+    // WAVE
+    // ==================================================
+    case "wave": {
+      const totalSteps =
+        Math.max(
+          rows + cols - 2,
+          1
+        );
+
+      const progress =
+        (
+          rowIndex +
+          colIndex
+        ) / totalSteps;
+
+      const wave =
+        (
+          Math.sin(
+            progress *
+              Math.PI *
+              2
+          ) +
+          1
+        ) / 2;
+
+      return (
+        lowest +
+        range * wave
+      );
+    }
+
+
+    // ==================================================
+    // RIPPLE
+    // Circular waves from the center
+    // ==================================================
+    case "ripple": {
+      const centerRow =
+        (rows - 1) / 2;
+
+      const centerCol =
+        (cols - 1) / 2;
+
+      const rowOffset =
+        rowIndex - centerRow;
+
+      const colOffset =
+        colIndex - centerCol;
+
+      const distance =
+        Math.sqrt(
+          rowOffset *
+            rowOffset +
+          colOffset *
+            colOffset
+        );
+
+      const ripple =
+        (
+          Math.cos(
+            distance *
+              Math.PI
+          ) +
+          1
+        ) / 2;
+
+      return (
+        lowest +
+        range * ripple
+      );
+    }
+
+
+    // ==================================================
+// SPIRAL
+// Smooth spiral with no sudden height jump
+// ==================================================
+case "spiral": {
+  const centerRow =
+    (rows - 1) / 2;
+
+  const centerCol =
+    (cols - 1) / 2;
+
+  const rowOffset =
+    rowIndex - centerRow;
+
+  const colOffset =
+    colIndex - centerCol;
+
+  const angle =
+    Math.atan2(
+      rowOffset,
+      colOffset
+    );
+
+  const distance =
+    Math.sqrt(
+      rowOffset * rowOffset +
+      colOffset * colOffset
+    );
+
+  const maxRadius =
+    Math.sqrt(
+      centerRow * centerRow +
+      centerCol * centerCol
+    );
+
+  const normalizedRadius =
+    maxRadius > 0
+      ? distance / maxRadius
+      : 0;
+
+  // Controls how tightly the spiral winds
+  const spiralTurns = 2;
+
+  const phase =
+    angle +
+    normalizedRadius *
+      Math.PI *
+      2 *
+      spiralTurns;
+
+  // Smooth 0 → 1 transition
+  const progress =
+    (
+      Math.sin(phase) +
+      1
+    ) / 2;
+
+  return (
+    lowest +
+    range * progress
+  );
+}
+
+
+    // ==================================================
+    // CHECKERBOARD
+    // ==================================================
+    case "checkerboard": {
+      const isHigh =
+        (
+          rowIndex +
+          colIndex
+        ) % 2 === 0;
+
+      return isHigh
+        ? highest
+        : lowest;
+    }
+
+
+    // ==================================================
+    // RANDOM
+    // Deterministic random:
+    // same grid position keeps same height
+    // ==================================================
+    case "random": {
+      const seed =
+        Math.sin(
+          rowIndex *
+            12.9898 +
+          colIndex *
+            78.233
+        ) *
+        43758.5453;
+
+      const randomValue =
+        seed -
+        Math.floor(seed);
+
+      return (
+        lowest +
+        range *
+          randomValue
+      );
+    }
+
+
+    // ==================================================
+    // FALLBACK
+    // ==================================================
+    default:
+      return lowest;
+  }
+}
+
+  // =====================================================
   // SYNC PENDANT GRID USING OBJECT REUSE
   // Only add/remove the difference.
   // =====================================================
@@ -748,14 +1121,16 @@ export default function ConfiguratorScene() {
       return;
     }
 
-    const {
-      rows,
-      cols,
-      spacingL,
-      spacingW,
-      lowest,
-    } =
-      compositionConfigRef.current;
+const {
+  rows,
+  cols,
+  spacingL,
+  spacingW,
+  lowest,
+  highest = lowest,
+  pattern = "flat",
+} =
+  compositionConfigRef.current;
 
     const safeRows =
       Math.max(
@@ -845,14 +1220,25 @@ export default function ConfiguratorScene() {
           (safeRows - 1) / 2
         ) * spacingL;
 
+        const y =
+  calculatePendantHeight({
+    rowIndex,
+    colIndex,
+    rows: safeRows,
+    cols: safeCols,
+    pattern,
+    lowest,
+    highest,
+  });
+
       const pendant =
         pendantRefs.current[index];
 
-      pendant.position.set(
-        x,
-        lowest,
-        z
-      );
+pendant.position.set(
+  x,
+  y,
+  z
+);
     }
 
     updateAllCables();
