@@ -41,7 +41,16 @@ export default function ConfiguratorScene() {
 
   const sceneRef = useRef(null);
   const baseplateRef = useRef(null);
-  const pendantRef = useRef(null);
+
+
+const pendantTemplateRef = useRef(null);
+
+const pendantRefs = useRef([]);
+const cableRefs = useRef([]);
+
+const cableGeometryRef = useRef(null);
+const cableMaterialRef = useRef(null);
+
   const lowestRef = useRef(compositionConfig.lowest);
 
   // =====================================================
@@ -59,6 +68,25 @@ export default function ConfiguratorScene() {
     scene.background = new THREE.Color(0xf5f5f5);
 
     sceneRef.current = scene;
+
+    // ---------------------------
+    // cable
+    // ---------------------------
+
+    cableGeometryRef.current =
+  new THREE.CylinderGeometry(
+    0.1,
+    0.1,
+    1,
+    8
+  );
+
+cableMaterialRef.current =
+  new THREE.MeshStandardMaterial({
+    color: 0x111111,
+    roughness: 0.6,
+    metalness: 0.1,
+  });
 
     // ---------------------------
     // CAMERA
@@ -175,6 +203,11 @@ export default function ConfiguratorScene() {
       );
 
       controls.dispose();
+      cableGeometryRef.current?.dispose();
+cableMaterialRef.current?.dispose();
+
+cableGeometryRef.current = null;
+cableMaterialRef.current = null;
       renderer.dispose();
 
       if (renderer.domElement.parentNode) {
@@ -298,8 +331,11 @@ export default function ConfiguratorScene() {
   workingModel.surfaceShape,
 ]);
 
+
+
+
 // =====================================================
-// LOAD ONE PENDANT
+// LOAD PENDANT TEMPLATE
 // Reload ONLY when pendant or color changes
 // =====================================================
 useEffect(() => {
@@ -331,15 +367,6 @@ useEffect(() => {
     return;
   }
 
-  // Remove old pendant
-  if (pendantRef.current) {
-    scene.remove(pendantRef.current);
-
-    disposeObject(pendantRef.current);
-
-    pendantRef.current = null;
-  }
-
   const loader = new GLTFLoader();
 
   let cancelled = false;
@@ -353,34 +380,35 @@ useEffect(() => {
         disposeObject(gltf.scene);
         return;
       }
+const pendant = gltf.scene;
 
-      const pendant = gltf.scene;
+pendant.updateMatrixWorld(true);
 
-      pendant.updateMatrixWorld(true);
+const box =
+  new THREE.Box3().setFromObject(
+    pendant
+  );
 
-      const box =
-        new THREE.Box3().setFromObject(pendant);
+const size =
+  new THREE.Vector3();
 
-      const size =
-        new THREE.Vector3();
+box.getSize(size);
 
-      box.getSize(size);
+console.log(
+  "Pendant GLB size:",
+  {
+    width: size.x,
+    height: size.y,
+    depth: size.z,
+  }
+);
 
-      console.log("Pendant GLB size:", {
-        width: size.x,
-        height: size.y,
-        depth: size.z,
-      });
+// Store ONE master GLB
+pendantTemplateRef.current =
+  pendant;
 
-      pendant.position.set(
-        0,
-        lowestRef.current,
-        0
-      );
-
-      scene.add(pendant);
-
-      pendantRef.current = pendant;
+// Create rows × cols clones
+rebuildPendantGrid();
     },
 
     undefined,
@@ -401,12 +429,15 @@ useEffect(() => {
   return () => {
     cancelled = true;
 
-    if (pendantRef.current) {
-      scene.remove(pendantRef.current);
+    clearCables();
+    clearPendants();
 
-      disposeObject(pendantRef.current);
+    if (pendantTemplateRef.current) {
+      disposeObject(
+        pendantTemplateRef.current
+      );
 
-      pendantRef.current = null;
+      pendantTemplateRef.current = null;
     }
   };
 
@@ -417,19 +448,234 @@ useEffect(() => {
 
   // =====================================================
 // PENDANT HEIGHT
-// Move existing pendant without reloading the GLB
+// Move ALL pendants without reloading the GLB
 // =====================================================
 useEffect(() => {
   lowestRef.current = compositionConfig.lowest;
 
-  const pendant = pendantRef.current;
+  pendantRefs.current.forEach((pendant) => {
+    pendant.position.y = compositionConfig.lowest;
+    pendant.updateMatrixWorld(true);
+  });
 
-  if (!pendant) return;
-
-  pendant.position.y = compositionConfig.lowest;
+  updateAllCables();
 
 }, [compositionConfig.lowest]);
 
+// =====================================================
+// BASEPLATE HEIGHT → UPDATE CABLES
+// =====================================================
+useEffect(() => {
+  updateAllCables();
+
+}, [
+  compositionConfig.surfaceHeight
+]);
+
+// =====================================================
+// MULTIPLE PENDANT GRID
+// Step 4C
+// =====================================================
+useEffect(() => {
+  rebuildPendantGrid();
+
+}, [
+  compositionConfig.rows,
+  compositionConfig.cols,
+  compositionConfig.spacingL,
+  compositionConfig.spacingW,
+]);
+
+function clearCables() {
+  const scene = sceneRef.current;
+
+  if (!scene) return;
+
+  cableRefs.current.forEach((cable) => {
+    scene.remove(cable);
+  });
+
+  cableRefs.current = [];
+}
+
+function clearPendants() {
+  const scene = sceneRef.current;
+
+  if (!scene) return;
+
+  pendantRefs.current.forEach((pendant) => {
+    scene.remove(pendant);
+  });
+
+  pendantRefs.current = [];
+}
+
+function createCableForPendant(pendant) {
+  const baseplate = baseplateRef.current;
+
+  if (!baseplate || !pendant) return null;
+
+  baseplate.updateMatrixWorld(true);
+  pendant.updateMatrixWorld(true);
+
+  const baseplateBox =
+    new THREE.Box3().setFromObject(baseplate);
+
+  const pendantBox =
+    new THREE.Box3().setFromObject(pendant);
+
+  const baseplateBottomY =
+    baseplateBox.min.y;
+
+  const pendantCenter =
+    new THREE.Vector3();
+
+  pendantBox.getCenter(pendantCenter);
+
+  // Shoot downward through the center
+  // to find the actual pendant surface
+  const raycaster =
+    new THREE.Raycaster();
+
+  raycaster.set(
+    new THREE.Vector3(
+      pendantCenter.x,
+      baseplateBottomY,
+      pendantCenter.z
+    ),
+    new THREE.Vector3(0, -1, 0)
+  );
+
+  const hits =
+    raycaster.intersectObject(
+      pendant,
+      true
+    );
+
+  let pendantTopY =
+    pendantBox.max.y;
+
+  if (hits.length > 0) {
+    pendantTopY =
+      hits[0].point.y;
+  }
+
+  const cableLength =
+    baseplateBottomY -
+    pendantTopY;
+
+  if (cableLength <= 0) {
+    console.warn(
+      "Cable length is invalid:",
+      cableLength
+    );
+
+    return null;
+  }
+
+const cable =
+  new THREE.Mesh(
+    cableGeometryRef.current,
+    cableMaterialRef.current
+  );
+
+  cable.scale.y = cableLength;
+
+  cable.position.set(
+    pendantCenter.x,
+    pendantTopY +
+      cableLength / 2,
+    pendantCenter.z
+  );
+
+  return cable;
+}
+
+function updateAllCables() {
+  const scene = sceneRef.current;
+
+  if (!scene) return;
+
+  clearCables();
+
+  pendantRefs.current.forEach(
+    (pendant) => {
+      const cable =
+        createCableForPendant(
+          pendant
+        );
+
+      if (!cable) return;
+
+      scene.add(cable);
+
+      cableRefs.current.push(cable);
+    }
+  );
+}
+
+function rebuildPendantGrid() {
+  const scene = sceneRef.current;
+  const template =
+    pendantTemplateRef.current;
+
+  if (!scene || !template) return;
+
+  clearCables();
+  clearPendants();
+
+  const {
+    rows,
+    cols,
+    spacingL,
+    spacingW,
+  } = compositionConfig;
+
+  for (
+    let rowIndex = 0;
+    rowIndex < rows;
+    rowIndex++
+  ) {
+    for (
+      let colIndex = 0;
+      colIndex < cols;
+      colIndex++
+    ) {
+
+      const x =
+        (
+          colIndex -
+          (cols - 1) / 2
+        ) * spacingW;
+
+      const z =
+        (
+          rowIndex -
+          (rows - 1) / 2
+        ) * spacingL;
+
+      // Clone our single loaded GLB
+      const pendant =
+        template.clone(true);
+
+      pendant.position.set(
+        x,
+        lowestRef.current,
+        z
+      );
+
+      pendant.updateMatrixWorld(true);
+
+      scene.add(pendant);
+
+      pendantRefs.current.push(
+        pendant
+      );
+    }
+  }
+
+  updateAllCables();
+}
   return (
     <div
       ref={containerRef}
