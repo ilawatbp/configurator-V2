@@ -48,6 +48,29 @@ export default function ConfiguratorScene() {
   const sceneRef = useRef(null);
   const baseplateRef = useRef(null);
 
+  // Camera / controls references
+const cameraRef = useRef(null);
+const controlsRef = useRef(null);
+
+const cameraTransitionRef = useRef({
+  active: false,
+
+  startPosition:
+    new THREE.Vector3(),
+
+  endPosition:
+    new THREE.Vector3(),
+
+  startTarget:
+    new THREE.Vector3(),
+
+  endTarget:
+    new THREE.Vector3(),
+
+  startTime: 0,
+  duration: 650,
+});
+
   // Master GLB
   const pendantTemplateRef =
     useRef(null);
@@ -131,6 +154,9 @@ export default function ConfiguratorScene() {
       220,
       300
     );
+
+    cameraRef.current =
+  camera;
 
     // ---------------------------
     // RENDERER
@@ -220,24 +246,95 @@ export default function ConfiguratorScene() {
       0
     );
 
+    controlsRef.current =
+  controls;
+
+  function handleControlsStart() {
+  cameraTransitionRef.current.active =
+    false;
+}
+
+controls.addEventListener(
+  "start",
+  handleControlsStart
+);
+
     // ---------------------------
     // ANIMATION
     // ---------------------------
     let animationFrame;
 
-    function animate() {
-      animationFrame =
-        requestAnimationFrame(
-          animate
-        );
+function animate() {
+  animationFrame =
+    requestAnimationFrame(
+      animate
+    );
 
-      controls.update();
+  // =====================================================
+  // SMOOTH CAMERA TRANSITION
+  // =====================================================
+  const transition =
+    cameraTransitionRef.current;
 
-      renderer.render(
-        scene,
-        camera
+  if (transition.active) {
+    const elapsed =
+      performance.now() -
+      transition.startTime;
+
+    const progress =
+      Math.min(
+        elapsed /
+          transition.duration,
+        1
+      );
+
+    // Smooth ease-in / ease-out
+    const eased =
+      progress < 0.5
+        ? 4 *
+          progress *
+          progress *
+          progress
+        : 1 -
+          Math.pow(
+            -2 * progress + 2,
+            3
+          ) /
+            2;
+
+    camera.position.lerpVectors(
+      transition.startPosition,
+      transition.endPosition,
+      eased
+    );
+
+    controls.target.lerpVectors(
+      transition.startTarget,
+      transition.endTarget,
+      eased
+    );
+
+    if (progress >= 1) {
+      transition.active =
+        false;
+
+      camera.position.copy(
+        transition.endPosition
+      );
+
+      controls.target.copy(
+        transition.endTarget
       );
     }
+  }
+
+  controls.update();
+
+  renderer.render(
+    scene,
+    camera
+  );
+}
 
     animate();
 
@@ -280,7 +377,18 @@ export default function ConfiguratorScene() {
         handleResize
       );
 
+      controls.removeEventListener(
+  "start",
+  handleControlsStart
+);
+
       controls.dispose();
+
+      controlsRef.current =
+  null;
+
+cameraRef.current =
+  null;
 
       grid.geometry?.dispose();
       grid.material?.dispose();
@@ -591,8 +699,15 @@ export default function ConfiguratorScene() {
             pendant
           );
 
-        // Build current grid
-        rebuildPendantGrid();
+// Build current grid
+rebuildPendantGrid();
+
+// Frame newly loaded pendant model
+requestAnimationFrame(
+  () => {
+    fitCameraToComposition();
+  }
+);
       },
 
       undefined,
@@ -682,6 +797,48 @@ export default function ConfiguratorScene() {
   }, [
     compositionConfig.surfaceHeight,
   ]);
+
+  // =====================================================
+// AUTO-FRAME CAMERA WHEN COMPOSITION CHANGES
+// =====================================================
+useEffect(() => {
+  const frameId =
+    requestAnimationFrame(
+      () => {
+        fitCameraToComposition();
+      }
+    );
+
+  return () => {
+    cancelAnimationFrame(
+      frameId
+    );
+  };
+}, [
+  // Grid / radial layout
+  compositionConfig.rows,
+  compositionConfig.cols,
+  compositionConfig.spacingL,
+  compositionConfig.spacingW,
+
+  // Height
+  compositionConfig.lowest,
+  compositionConfig.highest,
+  compositionConfig.pattern,
+
+  // Baseplate
+  compositionConfig.surfaceWidth,
+  compositionConfig.surfaceLength,
+  compositionConfig.surfaceHeight,
+  compositionConfig.baseOffset,
+
+  // Shape
+  workingModel.surfaceShape,
+
+  // Rotation can slightly affect
+  // bounds of asymmetrical pendants
+  compositionConfig.rotationPattern,
+]);
 
   // =====================================================
   // CALCULATE PENDANT ATTACHMENT
@@ -905,414 +1062,690 @@ export default function ConfiguratorScene() {
   // =====================================================
   // CALCULATE PENDANT HEIGHT
   // =====================================================
-  function calculatePendantHeight({
-    rowIndex,
-    colIndex,
-    rows,
-    cols,
-    pattern,
-    lowest,
-    highest,
-  }) {
-    const range =
-      highest - lowest;
-
-    switch (pattern) {
-      // ==================================================
-      // FLAT
-      // ==================================================
-      case "flat":
-        return lowest;
-
-      // ==================================================
-      // DIAGONAL
-      // ==================================================
-      case "diagonal": {
-        const maxStep =
-          (rows - 1) +
-          (cols - 1);
-
-        if (
-          maxStep === 0
-        ) {
-          return lowest;
-        }
-
-        const currentStep =
-          rowIndex +
-          colIndex;
-
-        const progress =
-          currentStep /
-          maxStep;
-
-        return (
-          lowest +
-          range *
-            progress
-        );
-      }
-
-      // ==================================================
-      // DOME
-      // Center = highest
-      // ==================================================
-      case "dome": {
-        const centerRow =
-          (rows - 1) /
-          2;
-
-        const centerCol =
-          (cols - 1) /
-          2;
-
-        const rowOffset =
-          rowIndex -
-          centerRow;
-
-        const colOffset =
-          colIndex -
-          centerCol;
-
-        const maxRowOffset =
-          centerRow;
-
-        const maxColOffset =
-          centerCol;
-
-        const normalizedRow =
-          maxRowOffset > 0
-            ? rowOffset /
-              maxRowOffset
-            : 0;
-
-        const normalizedCol =
-          maxColOffset > 0
-            ? colOffset /
-              maxColOffset
-            : 0;
-
-        const distance =
-          Math.sqrt(
-            normalizedRow *
-              normalizedRow +
-            normalizedCol *
-              normalizedCol
-          );
-
-        const maxDistance =
-          Math.sqrt(
-            (rows > 1
-              ? 1
-              : 0) +
-              (cols > 1
-                ? 1
-                : 0)
-          );
-
-        if (
-          maxDistance === 0
-        ) {
-          return highest;
-        }
-
-        const progress =
-          Math.min(
-            distance /
-              maxDistance,
-            1
-          );
-
-        return (
-          highest -
-          range *
-            progress
-        );
-      }
-
-      // ==================================================
-      // REVERSE DOME
-      // Center = lowest
-      // ==================================================
-      case "reverseDome": {
-        const centerRow =
-          (rows - 1) /
-          2;
-
-        const centerCol =
-          (cols - 1) /
-          2;
-
-        const rowOffset =
-          rowIndex -
-          centerRow;
-
-        const colOffset =
-          colIndex -
-          centerCol;
-
-        const maxRowOffset =
-          centerRow;
-
-        const maxColOffset =
-          centerCol;
-
-        const normalizedRow =
-          maxRowOffset > 0
-            ? rowOffset /
-              maxRowOffset
-            : 0;
-
-        const normalizedCol =
-          maxColOffset > 0
-            ? colOffset /
-              maxColOffset
-            : 0;
-
-        const distance =
-          Math.sqrt(
-            normalizedRow *
-              normalizedRow +
-            normalizedCol *
-              normalizedCol
-          );
-
-        const maxDistance =
-          Math.sqrt(
-            (rows > 1
-              ? 1
-              : 0) +
-              (cols > 1
-                ? 1
-                : 0)
-          );
-
-        if (
-          maxDistance === 0
-        ) {
-          return lowest;
-        }
-
-        const progress =
-          Math.min(
-            distance /
-              maxDistance,
-            1
-          );
-
-        return (
-          lowest +
-          range *
-            progress
-        );
-      }
-
-      // ==================================================
-      // WAVE
-      // ==================================================
-      case "wave": {
-        const totalSteps =
-          Math.max(
-            rows +
-              cols -
-              2,
-            1
-          );
-
-        const progress =
-          (
-            rowIndex +
-            colIndex
-          ) /
-          totalSteps;
-
-        const wave =
-          (
-            Math.sin(
-              progress *
-                Math.PI *
-                2
-            ) +
-            1
-          ) /
-          2;
-
-        return (
-          lowest +
-          range *
-            wave
-        );
-      }
-
-      // ==================================================
-      // RIPPLE
-      // ==================================================
-      case "ripple": {
-        const centerRow =
-          (rows - 1) /
-          2;
-
-        const centerCol =
-          (cols - 1) /
-          2;
-
-        const rowOffset =
-          rowIndex -
-          centerRow;
-
-        const colOffset =
-          colIndex -
-          centerCol;
-
-        const distance =
-          Math.sqrt(
-            rowOffset *
-              rowOffset +
-            colOffset *
-              colOffset
-          );
-
-        const ripple =
-          (
-            Math.cos(
-              distance *
-                Math.PI
-            ) +
-            1
-          ) /
-          2;
-
-        return (
-          lowest +
-          range *
-            ripple
-        );
-      }
-
-      // ==================================================
-      // SPIRAL
-      // ==================================================
-      case "spiral": {
-        const centerRow =
-          (rows - 1) /
-          2;
-
-        const centerCol =
-          (cols - 1) /
-          2;
-
-        const rowOffset =
-          rowIndex -
-          centerRow;
-
-        const colOffset =
-          colIndex -
-          centerCol;
-
-        const angle =
-          Math.atan2(
-            rowOffset,
-            colOffset
-          );
-
-        const distance =
-          Math.sqrt(
-            rowOffset *
-              rowOffset +
-            colOffset *
-              colOffset
-          );
-
-        const maxRadius =
-          Math.sqrt(
-            centerRow *
-              centerRow +
-            centerCol *
-              centerCol
-          );
-
-        const normalizedRadius =
-          maxRadius > 0
-            ? distance /
-              maxRadius
-            : 0;
-
-        const spiralTurns =
-          2;
-
-        const phase =
-          angle +
-          normalizedRadius *
-            Math.PI *
-            2 *
-            spiralTurns;
-
-        const progress =
-          (
-            Math.sin(
-              phase
-            ) +
-            1
-          ) /
-          2;
-
-        return (
-          lowest +
-          range *
-            progress
-        );
-      }
-
-      // ==================================================
-      // CHECKERBOARD
-      // ==================================================
-      case "checkerboard": {
-        const isHigh =
-          (
-            rowIndex +
-            colIndex
-          ) %
-            2 ===
-          0;
-
-        return isHigh
-          ? highest
-          : lowest;
-      }
-
-      // ==================================================
-      // RANDOM HEIGHT
-      // ==================================================
-      case "random": {
-        const seed =
-          Math.sin(
-            rowIndex *
-              12.9898 +
-            colIndex *
-              78.233
-          ) *
-          43758.5453;
-
-        const randomValue =
-          seed -
-          Math.floor(
-            seed
-          );
-
-        return (
-          lowest +
-          range *
-            randomValue
-        );
-      }
-
-      // ==================================================
-      // FALLBACK
-      // ==================================================
-      default:
-        return lowest;
-    }
+ // =====================================================
+// CALCULATE PENDANT HEIGHT
+//
+// Routes height calculation to the correct
+// pattern engine depending on baseplate shape.
+// =====================================================
+function calculatePendantHeight(params) {
+  if (
+    params.surfaceShape ===
+    "circle"
+  ) {
+    return calculateCircleHeight(
+      params
+    );
   }
+
+  return calculateRectangleHeight(
+    params
+  );
+}
+
+
+// =====================================================
+// RECTANGLE HEIGHT PATTERNS
+// Existing rectangular behavior
+// =====================================================
+function calculateRectangleHeight({
+  rowIndex,
+  colIndex,
+  rows,
+  cols,
+  pattern,
+  lowest,
+  highest,
+}) {
+  const range =
+    highest - lowest;
+
+  switch (pattern) {
+
+    // ==================================================
+    // FLAT
+    // ==================================================
+    case "flat":
+      return lowest;
+
+
+    // ==================================================
+    // DIAGONAL
+    // ==================================================
+    case "diagonal": {
+      const maxStep =
+        (rows - 1) +
+        (cols - 1);
+
+      if (maxStep === 0) {
+        return lowest;
+      }
+
+      const currentStep =
+        rowIndex +
+        colIndex;
+
+      const progress =
+        currentStep /
+        maxStep;
+
+      return (
+        lowest +
+        range * progress
+      );
+    }
+
+
+    // ==================================================
+    // DOME
+    // Center = highest
+    // Outside = lowest
+    // ==================================================
+    case "dome": {
+      const centerRow =
+        (rows - 1) / 2;
+
+      const centerCol =
+        (cols - 1) / 2;
+
+      const rowOffset =
+        rowIndex -
+        centerRow;
+
+      const colOffset =
+        colIndex -
+        centerCol;
+
+      const maxRowOffset =
+        centerRow;
+
+      const maxColOffset =
+        centerCol;
+
+      const normalizedRow =
+        maxRowOffset > 0
+          ? rowOffset /
+            maxRowOffset
+          : 0;
+
+      const normalizedCol =
+        maxColOffset > 0
+          ? colOffset /
+            maxColOffset
+          : 0;
+
+      const distance =
+        Math.sqrt(
+          normalizedRow *
+            normalizedRow +
+          normalizedCol *
+            normalizedCol
+        );
+
+      const maxDistance =
+        Math.sqrt(
+          (rows > 1 ? 1 : 0) +
+          (cols > 1 ? 1 : 0)
+        );
+
+      if (
+        maxDistance === 0
+      ) {
+        return highest;
+      }
+
+      const progress =
+        Math.min(
+          distance /
+            maxDistance,
+          1
+        );
+
+      return (
+        highest -
+        range * progress
+      );
+    }
+
+
+    // ==================================================
+    // REVERSE DOME
+    // Center = lowest
+    // Outside = highest
+    // ==================================================
+    case "reverseDome": {
+      const centerRow =
+        (rows - 1) / 2;
+
+      const centerCol =
+        (cols - 1) / 2;
+
+      const rowOffset =
+        rowIndex -
+        centerRow;
+
+      const colOffset =
+        colIndex -
+        centerCol;
+
+      const maxRowOffset =
+        centerRow;
+
+      const maxColOffset =
+        centerCol;
+
+      const normalizedRow =
+        maxRowOffset > 0
+          ? rowOffset /
+            maxRowOffset
+          : 0;
+
+      const normalizedCol =
+        maxColOffset > 0
+          ? colOffset /
+            maxColOffset
+          : 0;
+
+      const distance =
+        Math.sqrt(
+          normalizedRow *
+            normalizedRow +
+          normalizedCol *
+            normalizedCol
+        );
+
+      const maxDistance =
+        Math.sqrt(
+          (rows > 1 ? 1 : 0) +
+          (cols > 1 ? 1 : 0)
+        );
+
+      if (
+        maxDistance === 0
+      ) {
+        return lowest;
+      }
+
+      const progress =
+        Math.min(
+          distance /
+            maxDistance,
+          1
+        );
+
+      return (
+        lowest +
+        range * progress
+      );
+    }
+
+
+    // ==================================================
+    // WAVE
+    // ==================================================
+    case "wave": {
+      const totalSteps =
+        Math.max(
+          rows +
+            cols -
+            2,
+          1
+        );
+
+      const progress =
+        (
+          rowIndex +
+          colIndex
+        ) /
+        totalSteps;
+
+      const wave =
+        (
+          Math.sin(
+            progress *
+              Math.PI *
+              2
+          ) +
+          1
+        ) / 2;
+
+      return (
+        lowest +
+        range * wave
+      );
+    }
+
+
+    // ==================================================
+    // RIPPLE
+    // ==================================================
+    case "ripple": {
+      const centerRow =
+        (rows - 1) / 2;
+
+      const centerCol =
+        (cols - 1) / 2;
+
+      const rowOffset =
+        rowIndex -
+        centerRow;
+
+      const colOffset =
+        colIndex -
+        centerCol;
+
+      const distance =
+        Math.sqrt(
+          rowOffset *
+            rowOffset +
+          colOffset *
+            colOffset
+        );
+
+      const ripple =
+        (
+          Math.cos(
+            distance *
+              Math.PI
+          ) +
+          1
+        ) / 2;
+
+      return (
+        lowest +
+        range * ripple
+      );
+    }
+
+
+    // ==================================================
+    // SPIRAL
+    // ==================================================
+    case "spiral": {
+      const centerRow =
+        (rows - 1) / 2;
+
+      const centerCol =
+        (cols - 1) / 2;
+
+      const rowOffset =
+        rowIndex -
+        centerRow;
+
+      const colOffset =
+        colIndex -
+        centerCol;
+
+      const angle =
+        Math.atan2(
+          rowOffset,
+          colOffset
+        );
+
+      const distance =
+        Math.sqrt(
+          rowOffset *
+            rowOffset +
+          colOffset *
+            colOffset
+        );
+
+      const maxRadius =
+        Math.sqrt(
+          centerRow *
+            centerRow +
+          centerCol *
+            centerCol
+        );
+
+      const normalizedRadius =
+        maxRadius > 0
+          ? distance /
+            maxRadius
+          : 0;
+
+      const spiralTurns =
+        2;
+
+      const phase =
+        angle +
+        normalizedRadius *
+          Math.PI *
+          2 *
+          spiralTurns;
+
+      const progress =
+        (
+          Math.sin(
+            phase
+          ) +
+          1
+        ) / 2;
+
+      return (
+        lowest +
+        range * progress
+      );
+    }
+
+
+    // ==================================================
+    // CHECKERBOARD
+    // ==================================================
+    case "checkerboard": {
+      const isHigh =
+        (
+          rowIndex +
+          colIndex
+        ) %
+          2 ===
+        0;
+
+      return isHigh
+        ? highest
+        : lowest;
+    }
+
+
+    // ==================================================
+    // RANDOM
+    // ==================================================
+    case "random": {
+      const seed =
+        Math.sin(
+          rowIndex *
+            12.9898 +
+          colIndex *
+            78.233
+        ) *
+        43758.5453;
+
+      const randomValue =
+        seed -
+        Math.floor(seed);
+
+      return (
+        lowest +
+        range *
+          randomValue
+      );
+    }
+
+
+    // ==================================================
+    // FALLBACK
+    // ==================================================
+    default:
+      return lowest;
+  }
+}
+
+
+// =====================================================
+// CIRCLE HEIGHT PATTERNS
+//
+// Uses:
+// ringIndex
+// angle
+// radialProgress
+//
+// radialProgress:
+// center = 0
+// outer ring = 1
+// =====================================================
+function calculateCircleHeight({
+  rowIndex,
+  colIndex,
+  pattern,
+  lowest,
+  highest,
+  ringIndex,
+  angle,
+  radialProgress,
+}) {
+  const range =
+    highest - lowest;
+
+  const radiusProgress =
+    THREE.MathUtils.clamp(
+      radialProgress ?? 0,
+      0,
+      1
+    );
+
+  const safeAngle =
+    angle ?? 0;
+
+  const safeRingIndex =
+    ringIndex ?? 0;
+
+
+  // Physical normalized position
+  // within the circular layout.
+  const normalizedX =
+    Math.cos(
+      safeAngle
+    ) *
+    radiusProgress;
+
+  const normalizedZ =
+    Math.sin(
+      safeAngle
+    ) *
+    radiusProgress;
+
+
+  switch (pattern) {
+
+    // ==================================================
+    // FLAT
+    // Every pendant same height
+    // ==================================================
+    case "flat":
+      return lowest;
+
+
+    // ==================================================
+    // DOME
+    //
+    // Center = highest
+    // Outer ring = lowest
+    // ==================================================
+    case "dome": {
+      return (
+        highest -
+        range *
+          radiusProgress
+      );
+    }
+
+
+    // ==================================================
+    // REVERSE DOME
+    //
+    // Center = lowest
+    // Outer ring = highest
+    // ==================================================
+    case "reverseDome": {
+      return (
+        lowest +
+        range *
+          radiusProgress
+      );
+    }
+
+
+    // ==================================================
+    // DIAGONAL
+    //
+    // Physical diagonal gradient across
+    // the circular baseplate.
+    // ==================================================
+    case "diagonal": {
+      const direction =
+        (
+          normalizedX +
+          normalizedZ
+        ) /
+        Math.SQRT2;
+
+      const progress =
+        THREE.MathUtils.clamp(
+          (
+            direction +
+            1
+          ) / 2,
+          0,
+          1
+        );
+
+      return (
+        lowest +
+        range *
+          progress
+      );
+    }
+
+
+    // ==================================================
+    // WAVE
+    //
+    // Wave moves across the actual
+    // circular surface.
+    // ==================================================
+    case "wave": {
+      const wave =
+        (
+          Math.sin(
+            normalizedX *
+              Math.PI
+          ) +
+          1
+        ) / 2;
+
+      return (
+        lowest +
+        range *
+          wave
+      );
+    }
+
+
+    // ==================================================
+    // RIPPLE
+    //
+    // True concentric ripple.
+    // All pendants on the same ring
+    // share the same height.
+    // ==================================================
+    case "ripple": {
+      const ripple =
+        (
+          Math.cos(
+            radiusProgress *
+              Math.PI *
+              2
+          ) +
+          1
+        ) / 2;
+
+      return (
+        lowest +
+        range *
+          ripple
+      );
+    }
+
+
+    // ==================================================
+    // SPIRAL
+    //
+    // Uses actual circular angle
+    // plus distance from center.
+    // ==================================================
+    case "spiral": {
+      const spiralTurns =
+        2;
+
+      const phase =
+        safeAngle +
+        radiusProgress *
+          Math.PI *
+          2 *
+          spiralTurns;
+
+      const progress =
+        (
+          Math.sin(
+            phase
+          ) +
+          1
+        ) / 2;
+
+      return (
+        lowest +
+        range *
+          progress
+      );
+    }
+
+
+    // ==================================================
+    // CHECKERBOARD
+    //
+    // For a circle, alternating rings
+    // looks better than rectangular
+    // checkerboard indexing.
+    // ==================================================
+    case "checkerboard": {
+      const isHigh =
+        safeRingIndex %
+          2 ===
+        0;
+
+      return isHigh
+        ? highest
+        : lowest;
+    }
+
+
+    // ==================================================
+    // RANDOM
+    //
+    // Deterministic:
+    // same pendant keeps same height.
+    // ==================================================
+    case "random": {
+      const seed =
+        Math.sin(
+          (rowIndex + 1) *
+            12.9898 +
+          (colIndex + 1) *
+            78.233
+        ) *
+        43758.5453;
+
+      const randomValue =
+        seed -
+        Math.floor(
+          seed
+        );
+
+      return (
+        lowest +
+        range *
+          randomValue
+      );
+    }
+
+
+    // ==================================================
+    // FALLBACK
+    // ==================================================
+    default:
+      return lowest;
+  }
+}
 
   // =====================================================
   // APPLY PENDANT ROTATION
@@ -1441,6 +1874,197 @@ export default function ConfiguratorScene() {
   }
 
   // =====================================================
+// AUTO-FRAME CAMERA
+//
+// Fits the complete lighting composition
+// inside the viewport while preserving
+// the current viewing direction.
+// =====================================================
+function fitCameraToComposition() {
+  const camera =
+    cameraRef.current;
+
+  const controls =
+    controlsRef.current;
+
+  const baseplate =
+    baseplateRef.current;
+
+  if (
+    !camera ||
+    !controls ||
+    !baseplate
+  ) {
+    return;
+  }
+
+  // =====================================================
+  // CALCULATE COMPOSITION BOUNDS
+  // =====================================================
+  const box =
+    new THREE.Box3();
+
+  box.expandByObject(
+    baseplate
+  );
+
+  pendantRefs.current.forEach(
+    (pendant) => {
+      pendant.updateMatrixWorld(
+        true
+      );
+
+      box.expandByObject(
+        pendant
+      );
+    }
+  );
+
+  if (box.isEmpty()) {
+    return;
+  }
+
+  // =====================================================
+  // FIND CENTER + BOUNDING SPHERE
+  // =====================================================
+  const center =
+    new THREE.Vector3();
+
+  box.getCenter(
+    center
+  );
+
+  const sphere =
+    new THREE.Sphere();
+
+  box.getBoundingSphere(
+    sphere
+  );
+
+  const radius =
+    Math.max(
+      sphere.radius,
+      1
+    );
+
+  // =====================================================
+  // CALCULATE REQUIRED CAMERA DISTANCE
+  // =====================================================
+  const verticalFov =
+    THREE.MathUtils.degToRad(
+      camera.fov
+    );
+
+  const horizontalFov =
+    2 *
+    Math.atan(
+      Math.tan(
+        verticalFov / 2
+      ) *
+        camera.aspect
+    );
+
+  // Use the smaller FOV so the object
+  // fits both vertically and horizontally.
+  const limitingFov =
+    Math.min(
+      verticalFov,
+      horizontalFov
+    );
+
+  const padding =
+    1.25;
+
+  const distance =
+    (
+      radius /
+      Math.sin(
+        limitingFov / 2
+      )
+    ) *
+    padding;
+
+  // =====================================================
+  // PRESERVE CURRENT VIEWING ANGLE
+  // =====================================================
+  const direction =
+    new THREE.Vector3()
+      .subVectors(
+        camera.position,
+        controls.target
+      );
+
+  if (
+    direction.lengthSq() <
+    0.0001
+  ) {
+    direction.set(
+      1,
+      0.7,
+      1
+    );
+  }
+
+  direction.normalize();
+
+// =====================================================
+// CREATE SMOOTH CAMERA TRANSITION
+// =====================================================
+const targetPosition =
+  center
+    .clone()
+    .add(
+      direction.multiplyScalar(
+        distance
+      )
+    );
+
+const transition =
+  cameraTransitionRef.current;
+
+// Current camera state
+transition.startPosition.copy(
+  camera.position
+);
+
+transition.startTarget.copy(
+  controls.target
+);
+
+// Destination
+transition.endPosition.copy(
+  targetPosition
+);
+
+transition.endTarget.copy(
+  center
+);
+
+transition.startTime =
+  performance.now();
+
+transition.active =
+  true;
+
+  // =====================================================
+  // UPDATE CAMERA CLIPPING
+  // =====================================================
+  camera.near =
+    Math.max(
+      distance / 100,
+      0.1
+    );
+
+  camera.far =
+    Math.max(
+      distance * 10,
+      5000
+    );
+
+  camera.updateProjectionMatrix();
+}
+
+  // =====================================================
   // SYNC PENDANT GRID
   // Object pooling + circle clipping
   // =====================================================
@@ -1492,12 +2116,76 @@ export default function ConfiguratorScene() {
         Math.floor(cols)
       );
 
-    // =====================================================
-    // BUILD VALID GRID POSITIONS
-    // =====================================================
-    const positions =
-      [];
+// =====================================================
+// BUILD PENDANT POSITIONS
+//
+// Rectangle:
+//   Normal rows × columns grid
+//
+// Circle:
+//   Center + concentric circular rings
+// =====================================================
+const positions = [];
 
+
+
+
+// =====================================================
+// RECTANGLE POSITIONING
+// =====================================================
+if (
+  workingModel.surfaceShape !==
+  "circle"
+) {
+  for (
+    let rowIndex = 0;
+    rowIndex < safeRows;
+    rowIndex++
+  ) {
+    for (
+      let colIndex = 0;
+      colIndex < safeCols;
+      colIndex++
+    ) {
+      const x =
+        (
+          colIndex -
+          (safeCols - 1) / 2
+        ) * spacingW;
+
+      const z =
+        (
+          rowIndex -
+          (safeRows - 1) / 2
+        ) * spacingL;
+
+      positions.push({
+        rowIndex,
+        colIndex,
+        x,
+        z,
+
+        ringIndex: null,
+        angle: null,
+        radialProgress: null,
+      });
+    }
+  }
+}
+
+
+// =====================================================
+// CIRCLE POSITIONING
+// =====================================================
+else {
+  const totalPendants =
+    safeRows * safeCols;
+
+  if (totalPendants > 0) {
+
+    // ---------------------------------
+    // Calculate baseplate diameter
+    // ---------------------------------
     const autoLength =
       (safeRows - 1) *
         spacingL +
@@ -1527,63 +2215,177 @@ export default function ConfiguratorScene() {
     const circleRadius =
       circleDiameter / 2;
 
-    for (
-      let rowIndex = 0;
-      rowIndex <
-      safeRows;
-      rowIndex++
+    // Keep pendant centers slightly
+    // away from the edge of the plate.
+    const edgePadding =
+      Math.max(
+        baseOffset / 2,
+        0
+      );
+
+    const usableRadius =
+      Math.max(
+        circleRadius -
+          edgePadding,
+        0
+      );
+
+
+    // ---------------------------------
+    // CENTER PENDANT
+    // ---------------------------------
+    positions.push({
+      rowIndex: 0,
+      colIndex: 0,
+
+      x: 0,
+      z: 0,
+
+      ringIndex: 0,
+      angle: 0,
+      radialProgress: 0,
+    });
+
+
+    let remaining =
+      totalPendants - 1;
+
+    // ---------------------------------
+    // Determine how many rings
+    // are required.
+    //
+    // Ring capacities:
+    //
+    // ring 1 = 6
+    // ring 2 = 12
+    // ring 3 = 18
+    // ring 4 = 24
+    // ...
+    // ---------------------------------
+    let ringCount = 0;
+    let testRemaining =
+      remaining;
+
+    while (
+      testRemaining > 0
     ) {
+      ringCount++;
+
+      const capacity =
+        ringCount * 6;
+
+      testRemaining -=
+        capacity;
+    }
+
+
+    const ringSpacing =
+      ringCount > 0
+        ? usableRadius /
+          ringCount
+        : 0;
+
+
+    // ---------------------------------
+    // BUILD EACH RING
+    // ---------------------------------
+    let linearIndex = 1;
+
+    for (
+      let ringIndex = 1;
+      ringIndex <= ringCount;
+      ringIndex++
+    ) {
+      if (remaining <= 0) {
+        break;
+      }
+
+      const ringCapacity =
+        ringIndex * 6;
+
+      const pendantCount =
+        Math.min(
+          ringCapacity,
+          remaining
+        );
+
+      const radius =
+        ringSpacing *
+        ringIndex;
+
+      // Slightly rotate alternating rings.
+      // This avoids everything lining up
+      // like spokes.
+      const angleOffset =
+        ringIndex % 2 === 0
+          ? Math.PI /
+            pendantCount
+          : 0;
+
       for (
-        let colIndex = 0;
-        colIndex <
-        safeCols;
-        colIndex++
+        let itemIndex = 0;
+        itemIndex <
+        pendantCount;
+        itemIndex++
       ) {
-        const x =
+        const angle =
           (
-            colIndex -
-            (safeCols - 1) /
-              2
+            itemIndex /
+            pendantCount
           ) *
-          spacingW;
+            Math.PI *
+            2 +
+          angleOffset;
+
+        const x =
+          Math.cos(angle) *
+          radius;
 
         const z =
-          (
-            rowIndex -
-            (safeRows - 1) /
-              2
-          ) *
-          spacingL;
+          Math.sin(angle) *
+          radius;
 
-        // ---------------------------
-        // CIRCLE CLIPPING
-        // ---------------------------
-        if (
-          workingModel.surfaceShape ===
-          "circle"
-        ) {
-          const distanceFromCenter =
-            Math.sqrt(
-              x * x +
-              z * z
-            );
+        // Keep compatible row/column
+        // indexes for your existing
+        // height-pattern engine.
+        const rowIndex =
+          Math.floor(
+            linearIndex /
+            safeCols
+          );
 
-          if (
-            distanceFromCenter >
-            circleRadius
-          ) {
-            continue;
-          }
-        }
+        const colIndex =
+          linearIndex %
+          safeCols;
 
         positions.push({
           rowIndex,
           colIndex,
+
           x,
           z,
+
+          // Save radial information
+          // for future circle-specific
+          // height patterns.
+          ringIndex,
+          angle,
+
+          radialProgress:
+            ringCount > 0
+              ? ringIndex /
+                ringCount
+              : 0,
         });
+
+        linearIndex++;
       }
+
+      remaining -=
+        pendantCount;
     }
+  }
+}
 
     const requiredCount =
       positions.length;
@@ -1660,26 +2462,39 @@ export default function ConfiguratorScene() {
       requiredCount;
       index++
     ) {
-      const {
-        rowIndex,
-        colIndex,
-        x,
-        z,
-      } =
-        positions[index];
+ const {
+  rowIndex,
+  colIndex,
+  x,
+  z,
+  ringIndex,
+  angle,
+  radialProgress,
+} =
+  positions[index];
 
-      const y =
-        calculatePendantHeight({
-          rowIndex,
-          colIndex,
-          rows:
-            safeRows,
-          cols:
-            safeCols,
-          pattern,
-          lowest,
-          highest,
-        });
+const y =
+  calculatePendantHeight({
+    rowIndex,
+    colIndex,
+
+    rows:
+      safeRows,
+
+    cols:
+      safeCols,
+
+    pattern,
+    lowest,
+    highest,
+
+    surfaceShape:
+      workingModel.surfaceShape,
+
+    ringIndex,
+    angle,
+    radialProgress,
+  });
 
       const pendant =
         pendantRefs.current[
