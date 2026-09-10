@@ -38,40 +38,67 @@ export default function ConfiguratorScene() {
     compositionConfig,
   } = useContext(ConfiguratorContext);
 
-  // Keep the latest config available to async GLB callbacks.
-  const compositionConfigRef = useRef(compositionConfig);
-  compositionConfigRef.current = compositionConfig;
+  // Keep latest config available to async callbacks.
+  const compositionConfigRef =
+    useRef(compositionConfig);
+
+  compositionConfigRef.current =
+    compositionConfig;
 
   const sceneRef = useRef(null);
   const baseplateRef = useRef(null);
 
-  // One loaded GLB is kept as the master/template.
-  const pendantTemplateRef = useRef(null);
+  // Master GLB
+  const pendantTemplateRef =
+    useRef(null);
 
-  // Active scene objects.
-  const pendantRefs = useRef([]);
-  const cableRefs = useRef([]);
+  // Active scene objects
+  const pendantRefs =
+    useRef([]);
 
-  // Cable attachment is calculated only once per loaded GLB.
-  const pendantAttachmentLocalRef = useRef(null);
+  const cableRefs =
+    useRef([]);
 
-  // All cables share one geometry and one material.
-  const cableGeometryRef = useRef(null);
-  const cableMaterialRef = useRef(null);
+  // GLB-specific information
+  const pendantAttachmentLocalRef =
+    useRef(null);
+
+  const pendantBaseQuaternionRef =
+    useRef(null);
+
+  // Shared cable resources
+  const cableGeometryRef =
+    useRef(null);
+
+  const cableMaterialRef =
+    useRef(null);
 
   // =====================================================
   // CREATE THREE.JS SCENE
   // =====================================================
   useEffect(() => {
-    const container = containerRef.current;
+    const container =
+      containerRef.current;
 
     if (!container) return;
 
-    const scene = new THREE.Scene();
-    scene.background = new THREE.Color(0xf5f5f5);
-    sceneRef.current = scene;
+    // ---------------------------
+    // SCENE
+    // ---------------------------
+    const scene =
+      new THREE.Scene();
 
-    // Shared cable geometry/material.
+    scene.background =
+      new THREE.Color(
+        0xf5f5f5
+      );
+
+    sceneRef.current =
+      scene;
+
+    // ---------------------------
+    // SHARED CABLE RESOURCES
+    // ---------------------------
     cableGeometryRef.current =
       new THREE.CylinderGeometry(
         0.1,
@@ -87,18 +114,31 @@ export default function ConfiguratorScene() {
         metalness: 0.1,
       });
 
-    const camera = new THREE.PerspectiveCamera(
-      60,
-      container.clientWidth / container.clientHeight,
-      0.1,
-      5000
+    // ---------------------------
+    // CAMERA
+    // ---------------------------
+    const camera =
+      new THREE.PerspectiveCamera(
+        60,
+        container.clientWidth /
+          container.clientHeight,
+        0.1,
+        5000
+      );
+
+    camera.position.set(
+      220,
+      220,
+      300
     );
 
-    camera.position.set(220, 220, 300);
-
-    const renderer = new THREE.WebGLRenderer({
-      antialias: true,
-    });
+    // ---------------------------
+    // RENDERER
+    // ---------------------------
+    const renderer =
+      new THREE.WebGLRenderer({
+        antialias: true,
+      });
 
     renderer.setSize(
       container.clientWidth,
@@ -106,18 +146,28 @@ export default function ConfiguratorScene() {
     );
 
     renderer.setPixelRatio(
-      Math.min(window.devicePixelRatio, 2)
+      Math.min(
+        window.devicePixelRatio,
+        2
+      )
     );
 
-    container.appendChild(renderer.domElement);
+    container.appendChild(
+      renderer.domElement
+    );
 
+    // ---------------------------
+    // LIGHTS
+    // ---------------------------
     const ambientLight =
       new THREE.AmbientLight(
         0xffffff,
         1.5
       );
 
-    scene.add(ambientLight);
+    scene.add(
+      ambientLight
+    );
 
     const directionalLight =
       new THREE.DirectionalLight(
@@ -131,28 +181,48 @@ export default function ConfiguratorScene() {
       200
     );
 
-    scene.add(directionalLight);
+    scene.add(
+      directionalLight
+    );
 
+    // ---------------------------
+    // GRID
+    // ---------------------------
     const grid =
       new THREE.GridHelper(
         1000,
         50
       );
 
-    grid.material.transparent = true;
-    grid.material.opacity = 0.08;
+    grid.material.transparent =
+      true;
+
+    grid.material.opacity =
+      0.08;
 
     scene.add(grid);
 
+    // ---------------------------
+    // CONTROLS
+    // ---------------------------
     const controls =
       new OrbitControls(
         camera,
         renderer.domElement
       );
 
-    controls.enableDamping = true;
-    controls.target.set(0, 80, 0);
+    controls.enableDamping =
+      true;
 
+    controls.target.set(
+      0,
+      80,
+      0
+    );
+
+    // ---------------------------
+    // ANIMATION
+    // ---------------------------
     let animationFrame;
 
     function animate() {
@@ -171,6 +241,9 @@ export default function ConfiguratorScene() {
 
     animate();
 
+    // ---------------------------
+    // RESIZE
+    // ---------------------------
     function handleResize() {
       const width =
         container.clientWidth;
@@ -194,6 +267,9 @@ export default function ConfiguratorScene() {
       handleResize
     );
 
+    // ---------------------------
+    // CLEANUP
+    // ---------------------------
     return () => {
       cancelAnimationFrame(
         animationFrame
@@ -212,31 +288,46 @@ export default function ConfiguratorScene() {
       cableGeometryRef.current?.dispose();
       cableMaterialRef.current?.dispose();
 
-      cableGeometryRef.current = null;
-      cableMaterialRef.current = null;
+      cableGeometryRef.current =
+        null;
 
-      if (baseplateRef.current) {
+      cableMaterialRef.current =
+        null;
+
+      if (
+        baseplateRef.current
+      ) {
         scene.remove(
           baseplateRef.current
         );
 
-        baseplateRef.current.geometry?.dispose();
-        baseplateRef.current.material?.dispose();
+        baseplateRef.current
+          .geometry
+          ?.dispose();
 
-        baseplateRef.current = null;
+        baseplateRef.current
+          .material
+          ?.dispose();
+
+        baseplateRef.current =
+          null;
       }
 
       renderer.dispose();
 
       if (
-        renderer.domElement.parentNode
+        renderer.domElement
+          .parentNode
       ) {
-        renderer.domElement.parentNode.removeChild(
-          renderer.domElement
-        );
+        renderer.domElement
+          .parentNode
+          .removeChild(
+            renderer.domElement
+          );
       }
 
-      sceneRef.current = null;
+      sceneRef.current =
+        null;
     };
   }, []);
 
@@ -244,7 +335,8 @@ export default function ConfiguratorScene() {
   // BASEPLATE
   // =====================================================
   useEffect(() => {
-    const scene = sceneRef.current;
+    const scene =
+      sceneRef.current;
 
     if (!scene) return;
 
@@ -258,7 +350,8 @@ export default function ConfiguratorScene() {
       surfaceHeight,
       baseOffset,
       circleSegments,
-    } = compositionConfig;
+    } =
+      compositionConfig;
 
     const autoLength =
       (rows - 1) *
@@ -280,29 +373,42 @@ export default function ConfiguratorScene() {
         ? surfaceWidth
         : autoWidth;
 
-    if (baseplateRef.current) {
+    // Remove old baseplate
+    if (
+      baseplateRef.current
+    ) {
       scene.remove(
         baseplateRef.current
       );
 
-      baseplateRef.current.geometry?.dispose();
-      baseplateRef.current.material?.dispose();
+      baseplateRef.current
+        .geometry
+        ?.dispose();
 
-      baseplateRef.current = null;
+      baseplateRef.current
+        .material
+        ?.dispose();
+
+      baseplateRef.current =
+        null;
     }
 
     const thickness = 4;
 
     let geometry;
 
+    // ---------------------------
+    // CIRCLE
+    // ---------------------------
     if (
       workingModel.surfaceShape ===
       "circle"
     ) {
-      const diameter = Math.min(
-        resolvedWidth,
-        resolvedLength
-      );
+      const diameter =
+        Math.min(
+          resolvedWidth,
+          resolvedLength
+        );
 
       const radius =
         diameter / 2;
@@ -314,7 +420,12 @@ export default function ConfiguratorScene() {
           thickness,
           circleSegments
         );
-    } else {
+    }
+
+    // ---------------------------
+    // RECTANGLE
+    // ---------------------------
+    else {
       geometry =
         new THREE.BoxGeometry(
           resolvedWidth,
@@ -342,7 +453,9 @@ export default function ConfiguratorScene() {
       0
     );
 
-    scene.add(baseplate);
+    scene.add(
+      baseplate
+    );
 
     baseplateRef.current =
       baseplate;
@@ -361,7 +474,7 @@ export default function ConfiguratorScene() {
 
   // =====================================================
   // LOAD PENDANT TEMPLATE
-  // Reload ONLY when pendant or color changes
+  // Reload only when model/color changes
   // =====================================================
   useEffect(() => {
     const scene =
@@ -376,13 +489,16 @@ export default function ConfiguratorScene() {
           workingModel.id
       );
 
-    if (!selectedModel) return;
+    if (!selectedModel) {
+      return;
+    }
 
     const modelPath =
       selectedModel.models?.[
         workingModel.color
       ] ??
-      selectedModel.models?.default;
+      selectedModel.models
+        ?.default;
 
     console.log(
       "Selected ID:",
@@ -412,11 +528,13 @@ export default function ConfiguratorScene() {
     const loader =
       new GLTFLoader();
 
-    let cancelled = false;
+    let cancelled =
+      false;
 
     loader.load(
       modelPath,
 
+      // SUCCESS
       (gltf) => {
         if (cancelled) {
           disposeObject(
@@ -429,14 +547,22 @@ export default function ConfiguratorScene() {
         const pendant =
           gltf.scene;
 
+        // Save original GLB rotation
+        pendantBaseQuaternionRef.current =
+          pendant.quaternion.clone();
+
         pendant.updateMatrixWorld(
           true
         );
 
+        // ---------------------------
+        // DEBUG GLB SIZE
+        // ---------------------------
         const box =
-          new THREE.Box3().setFromObject(
-            pendant
-          );
+          new THREE.Box3()
+            .setFromObject(
+              pendant
+            );
 
         const size =
           new THREE.Vector3();
@@ -446,28 +572,36 @@ export default function ConfiguratorScene() {
         console.log(
           "Pendant GLB size:",
           {
-            width: size.x,
-            height: size.y,
-            depth: size.z,
+            width:
+              size.x,
+            height:
+              size.y,
+            depth:
+              size.z,
           }
         );
 
+        // Save ONE master GLB
         pendantTemplateRef.current =
           pendant;
 
-        // Calculate cable attachment ONCE for this GLB.
+        // Find cable attachment once
         pendantAttachmentLocalRef.current =
           calculatePendantAttachment(
             pendant
           );
 
+        // Build current grid
         rebuildPendantGrid();
       },
 
       undefined,
 
+      // ERROR
       (error) => {
-        if (cancelled) return;
+        if (cancelled) {
+          return;
+        }
 
         console.error(
           "Error loading GLB:",
@@ -477,13 +611,20 @@ export default function ConfiguratorScene() {
       }
     );
 
+    // ---------------------------
+    // GLB CLEANUP
+    // ---------------------------
     return () => {
-      cancelled = true;
+      cancelled =
+        true;
 
       clearCables();
       clearPendants();
 
       pendantAttachmentLocalRef.current =
+        null;
+
+      pendantBaseQuaternionRef.current =
         null;
 
       if (
@@ -502,21 +643,39 @@ export default function ConfiguratorScene() {
     workingModel.color,
   ]);
 
-// =====================================================
-// HEIGHT PATTERN SETTINGS
-// Recalculate pendant Y positions
-// =====================================================
-useEffect(() => {
-  rebuildPendantGrid();
+  // =====================================================
+  // PENDANT LAYOUT + HEIGHT + ROTATION
+  // One effect for all layout-related changes
+  // =====================================================
+  useEffect(() => {
+    rebuildPendantGrid();
+  }, [
+    // Grid
+    compositionConfig.rows,
+    compositionConfig.cols,
+    compositionConfig.spacingL,
+    compositionConfig.spacingW,
 
-}, [
-  compositionConfig.lowest,
-  compositionConfig.highest,
-  compositionConfig.pattern,
-]);
+    // Height pattern
+    compositionConfig.lowest,
+    compositionConfig.highest,
+    compositionConfig.pattern,
+
+    // Rotation
+    compositionConfig.rotationPattern,
+
+    // Surface / clipping
+    compositionConfig.surfaceWidth,
+    compositionConfig.surfaceLength,
+    compositionConfig.baseOffset,
+
+    // Baseplate shape
+    workingModel.surfaceShape,
+  ]);
 
   // =====================================================
-  // BASEPLATE HEIGHT → UPDATE EXISTING CABLES
+  // BASEPLATE HEIGHT
+  // Only cable lengths need updating
   // =====================================================
   useEffect(() => {
     updateAllCables();
@@ -525,20 +684,8 @@ useEffect(() => {
   ]);
 
   // =====================================================
-  // MULTIPLE PENDANT GRID
-  // Reuse existing pendants/cables.
-  // =====================================================
-  useEffect(() => {
-    rebuildPendantGrid();
-  }, [
-    compositionConfig.rows,
-    compositionConfig.cols,
-    compositionConfig.spacingL,
-    compositionConfig.spacingW,
-  ]);
-
-  // =====================================================
-  // CALCULATE CABLE ATTACHMENT ONCE PER GLB
+  // CALCULATE PENDANT ATTACHMENT
+  // Raycast only ONCE per loaded GLB
   // =====================================================
   function calculatePendantAttachment(
     template
@@ -548,14 +695,17 @@ useEffect(() => {
     );
 
     const box =
-      new THREE.Box3().setFromObject(
-        template
-      );
+      new THREE.Box3()
+        .setFromObject(
+          template
+        );
 
     const center =
       new THREE.Vector3();
 
-    box.getCenter(center);
+    box.getCenter(
+      center
+    );
 
     const raycaster =
       new THREE.Raycaster();
@@ -563,7 +713,8 @@ useEffect(() => {
     raycaster.set(
       new THREE.Vector3(
         center.x,
-        box.max.y + 1000,
+        box.max.y +
+          1000,
         center.z
       ),
       new THREE.Vector3(
@@ -581,9 +732,13 @@ useEffect(() => {
 
     let attachmentWorld;
 
-    if (hits.length > 0) {
+    if (
+      hits.length > 0
+    ) {
       attachmentWorld =
-        hits[0].point.clone();
+        hits[0]
+          .point
+          .clone();
     } else {
       attachmentWorld =
         new THREE.Vector3(
@@ -600,52 +755,60 @@ useEffect(() => {
 
   // =====================================================
   // CLEAR ALL CABLES
-  // Used only when changing model/color or cleaning up.
   // =====================================================
   function clearCables() {
     const scene =
       sceneRef.current;
 
     if (!scene) {
-      cableRefs.current = [];
+      cableRefs.current =
+        [];
+
       return;
     }
 
     cableRefs.current.forEach(
       (cable) => {
-        scene.remove(cable);
+        scene.remove(
+          cable
+        );
       }
     );
 
-    cableRefs.current = [];
+    cableRefs.current =
+      [];
   }
 
   // =====================================================
   // CLEAR ALL PENDANTS
-  // Clones share geometry/material with the template,
-  // so do not dispose clones individually here.
   // =====================================================
   function clearPendants() {
     const scene =
       sceneRef.current;
 
     if (!scene) {
-      pendantRefs.current = [];
+      pendantRefs.current =
+        [];
+
       return;
     }
 
     pendantRefs.current.forEach(
       (pendant) => {
-        scene.remove(pendant);
+        scene.remove(
+          pendant
+        );
       }
     );
 
-    pendantRefs.current = [];
+    pendantRefs.current =
+      [];
   }
 
   // =====================================================
   // UPDATE EXISTING CABLES
-  // No raycasts and no cable mesh recreation here.
+  // No raycast
+  // No cable recreation
   // =====================================================
   function updateAllCables() {
     const baseplate =
@@ -665,25 +828,33 @@ useEffect(() => {
       true
     );
 
-    // Calculate the bottom of the baseplate once.
+    // Calculate baseplate bottom once
     const baseplateBox =
-      new THREE.Box3().setFromObject(
-        baseplate
-      );
+      new THREE.Box3()
+        .setFromObject(
+          baseplate
+        );
 
     const baseplateBottomY =
       baseplateBox.min.y;
 
-    // Reuse one Vector3 for the whole loop.
+    // Reuse Vector3
     const attachmentWorld =
       new THREE.Vector3();
 
     pendantRefs.current.forEach(
-      (pendant, index) => {
+      (
+        pendant,
+        index
+      ) => {
         const cable =
-          cableRefs.current[index];
+          cableRefs.current[
+            index
+          ];
 
-        if (!cable) return;
+        if (!cable) {
+          return;
+        }
 
         pendant.updateMatrixWorld(
           true
@@ -701,12 +872,17 @@ useEffect(() => {
           baseplateBottomY -
           attachmentWorld.y;
 
-        if (cableLength <= 0) {
-          cable.visible = false;
+        if (
+          cableLength <= 0
+        ) {
+          cable.visible =
+            false;
+
           return;
         }
 
-        cable.visible = true;
+        cable.visible =
+          true;
 
         cable.scale.set(
           1,
@@ -716,8 +892,10 @@ useEffect(() => {
 
         cable.position.set(
           attachmentWorld.x,
+
           attachmentWorld.y +
             cableLength / 2,
+
           attachmentWorld.z
         );
       }
@@ -725,385 +903,546 @@ useEffect(() => {
   }
 
   // =====================================================
-// CALCULATE PENDANT HEIGHT
-// Step 4D - Height Pattern Engine
-// =====================================================
-function calculatePendantHeight({
-  rowIndex,
-  colIndex,
-  rows,
-  cols,
-  pattern,
-  lowest,
-  highest,
-}) {
-  const range =
-    highest - lowest;
+  // CALCULATE PENDANT HEIGHT
+  // =====================================================
+  function calculatePendantHeight({
+    rowIndex,
+    colIndex,
+    rows,
+    cols,
+    pattern,
+    lowest,
+    highest,
+  }) {
+    const range =
+      highest - lowest;
 
-  switch (pattern) {
-
-    // ==================================================
-    // FLAT
-    // ==================================================
-    case "flat":
-      return lowest;
-
-
-    // ==================================================
-    // DIAGONAL
-    // ==================================================
-    case "diagonal": {
-      const maxStep =
-        (rows - 1) +
-        (cols - 1);
-
-      if (maxStep === 0) {
+    switch (pattern) {
+      // ==================================================
+      // FLAT
+      // ==================================================
+      case "flat":
         return lowest;
-      }
 
-      const currentStep =
-        rowIndex +
-        colIndex;
+      // ==================================================
+      // DIAGONAL
+      // ==================================================
+      case "diagonal": {
+        const maxStep =
+          (rows - 1) +
+          (cols - 1);
 
-      const progress =
-        currentStep /
-        maxStep;
+        if (
+          maxStep === 0
+        ) {
+          return lowest;
+        }
 
-      return (
-        lowest +
-        range * progress
-      );
-    }
-
-
-    // ==================================================
-    // DOME
-    // Center = highest
-    // Outside = lowest
-    // ==================================================
-    case "dome": {
-      const centerRow =
-        (rows - 1) / 2;
-
-      const centerCol =
-        (cols - 1) / 2;
-
-      const rowOffset =
-        rowIndex - centerRow;
-
-      const colOffset =
-        colIndex - centerCol;
-
-      const maxRowOffset =
-        centerRow;
-
-      const maxColOffset =
-        centerCol;
-
-      const normalizedRow =
-        maxRowOffset > 0
-          ? rowOffset /
-            maxRowOffset
-          : 0;
-
-      const normalizedCol =
-        maxColOffset > 0
-          ? colOffset /
-            maxColOffset
-          : 0;
-
-      const distance =
-        Math.sqrt(
-          normalizedRow *
-            normalizedRow +
-          normalizedCol *
-            normalizedCol
-        );
-
-      const maxDistance =
-        Math.sqrt(
-          (rows > 1 ? 1 : 0) +
-          (cols > 1 ? 1 : 0)
-        );
-
-      if (maxDistance === 0) {
-        return highest;
-      }
-
-      const progress =
-        Math.min(
-          distance /
-            maxDistance,
-          1
-        );
-
-      return (
-        highest -
-        range * progress
-      );
-    }
-
-
-    // ==================================================
-    // REVERSE DOME
-    // Center = lowest
-    // Outside = highest
-    // ==================================================
-    case "reverseDome": {
-      const centerRow =
-        (rows - 1) / 2;
-
-      const centerCol =
-        (cols - 1) / 2;
-
-      const rowOffset =
-        rowIndex - centerRow;
-
-      const colOffset =
-        colIndex - centerCol;
-
-      const maxRowOffset =
-        centerRow;
-
-      const maxColOffset =
-        centerCol;
-
-      const normalizedRow =
-        maxRowOffset > 0
-          ? rowOffset /
-            maxRowOffset
-          : 0;
-
-      const normalizedCol =
-        maxColOffset > 0
-          ? colOffset /
-            maxColOffset
-          : 0;
-
-      const distance =
-        Math.sqrt(
-          normalizedRow *
-            normalizedRow +
-          normalizedCol *
-            normalizedCol
-        );
-
-      const maxDistance =
-        Math.sqrt(
-          (rows > 1 ? 1 : 0) +
-          (cols > 1 ? 1 : 0)
-        );
-
-      if (maxDistance === 0) {
-        return lowest;
-      }
-
-      const progress =
-        Math.min(
-          distance /
-            maxDistance,
-          1
-        );
-
-      return (
-        lowest +
-        range * progress
-      );
-    }
-
-
-    // ==================================================
-    // WAVE
-    // ==================================================
-    case "wave": {
-      const totalSteps =
-        Math.max(
-          rows + cols - 2,
-          1
-        );
-
-      const progress =
-        (
+        const currentStep =
           rowIndex +
-          colIndex
-        ) / totalSteps;
+          colIndex;
 
-      const wave =
-        (
-          Math.sin(
-            progress *
-              Math.PI *
-              2
-          ) +
-          1
-        ) / 2;
+        const progress =
+          currentStep /
+          maxStep;
 
-      return (
-        lowest +
-        range * wave
-      );
-    }
+        return (
+          lowest +
+          range *
+            progress
+        );
+      }
 
+      // ==================================================
+      // DOME
+      // Center = highest
+      // ==================================================
+      case "dome": {
+        const centerRow =
+          (rows - 1) /
+          2;
 
-    // ==================================================
-    // RIPPLE
-    // Circular waves from the center
-    // ==================================================
-    case "ripple": {
-      const centerRow =
-        (rows - 1) / 2;
+        const centerCol =
+          (cols - 1) /
+          2;
 
-      const centerCol =
-        (cols - 1) / 2;
+        const rowOffset =
+          rowIndex -
+          centerRow;
 
-      const rowOffset =
-        rowIndex - centerRow;
+        const colOffset =
+          colIndex -
+          centerCol;
 
-      const colOffset =
-        colIndex - centerCol;
+        const maxRowOffset =
+          centerRow;
 
-      const distance =
-        Math.sqrt(
-          rowOffset *
-            rowOffset +
-          colOffset *
+        const maxColOffset =
+          centerCol;
+
+        const normalizedRow =
+          maxRowOffset > 0
+            ? rowOffset /
+              maxRowOffset
+            : 0;
+
+        const normalizedCol =
+          maxColOffset > 0
+            ? colOffset /
+              maxColOffset
+            : 0;
+
+        const distance =
+          Math.sqrt(
+            normalizedRow *
+              normalizedRow +
+            normalizedCol *
+              normalizedCol
+          );
+
+        const maxDistance =
+          Math.sqrt(
+            (rows > 1
+              ? 1
+              : 0) +
+              (cols > 1
+                ? 1
+                : 0)
+          );
+
+        if (
+          maxDistance === 0
+        ) {
+          return highest;
+        }
+
+        const progress =
+          Math.min(
+            distance /
+              maxDistance,
+            1
+          );
+
+        return (
+          highest -
+          range *
+            progress
+        );
+      }
+
+      // ==================================================
+      // REVERSE DOME
+      // Center = lowest
+      // ==================================================
+      case "reverseDome": {
+        const centerRow =
+          (rows - 1) /
+          2;
+
+        const centerCol =
+          (cols - 1) /
+          2;
+
+        const rowOffset =
+          rowIndex -
+          centerRow;
+
+        const colOffset =
+          colIndex -
+          centerCol;
+
+        const maxRowOffset =
+          centerRow;
+
+        const maxColOffset =
+          centerCol;
+
+        const normalizedRow =
+          maxRowOffset > 0
+            ? rowOffset /
+              maxRowOffset
+            : 0;
+
+        const normalizedCol =
+          maxColOffset > 0
+            ? colOffset /
+              maxColOffset
+            : 0;
+
+        const distance =
+          Math.sqrt(
+            normalizedRow *
+              normalizedRow +
+            normalizedCol *
+              normalizedCol
+          );
+
+        const maxDistance =
+          Math.sqrt(
+            (rows > 1
+              ? 1
+              : 0) +
+              (cols > 1
+                ? 1
+                : 0)
+          );
+
+        if (
+          maxDistance === 0
+        ) {
+          return lowest;
+        }
+
+        const progress =
+          Math.min(
+            distance /
+              maxDistance,
+            1
+          );
+
+        return (
+          lowest +
+          range *
+            progress
+        );
+      }
+
+      // ==================================================
+      // WAVE
+      // ==================================================
+      case "wave": {
+        const totalSteps =
+          Math.max(
+            rows +
+              cols -
+              2,
+            1
+          );
+
+        const progress =
+          (
+            rowIndex +
+            colIndex
+          ) /
+          totalSteps;
+
+        const wave =
+          (
+            Math.sin(
+              progress *
+                Math.PI *
+                2
+            ) +
+            1
+          ) /
+          2;
+
+        return (
+          lowest +
+          range *
+            wave
+        );
+      }
+
+      // ==================================================
+      // RIPPLE
+      // ==================================================
+      case "ripple": {
+        const centerRow =
+          (rows - 1) /
+          2;
+
+        const centerCol =
+          (cols - 1) /
+          2;
+
+        const rowOffset =
+          rowIndex -
+          centerRow;
+
+        const colOffset =
+          colIndex -
+          centerCol;
+
+        const distance =
+          Math.sqrt(
+            rowOffset *
+              rowOffset +
+            colOffset *
+              colOffset
+          );
+
+        const ripple =
+          (
+            Math.cos(
+              distance *
+                Math.PI
+            ) +
+            1
+          ) /
+          2;
+
+        return (
+          lowest +
+          range *
+            ripple
+        );
+      }
+
+      // ==================================================
+      // SPIRAL
+      // ==================================================
+      case "spiral": {
+        const centerRow =
+          (rows - 1) /
+          2;
+
+        const centerCol =
+          (cols - 1) /
+          2;
+
+        const rowOffset =
+          rowIndex -
+          centerRow;
+
+        const colOffset =
+          colIndex -
+          centerCol;
+
+        const angle =
+          Math.atan2(
+            rowOffset,
             colOffset
+          );
+
+        const distance =
+          Math.sqrt(
+            rowOffset *
+              rowOffset +
+            colOffset *
+              colOffset
+          );
+
+        const maxRadius =
+          Math.sqrt(
+            centerRow *
+              centerRow +
+            centerCol *
+              centerCol
+          );
+
+        const normalizedRadius =
+          maxRadius > 0
+            ? distance /
+              maxRadius
+            : 0;
+
+        const spiralTurns =
+          2;
+
+        const phase =
+          angle +
+          normalizedRadius *
+            Math.PI *
+            2 *
+            spiralTurns;
+
+        const progress =
+          (
+            Math.sin(
+              phase
+            ) +
+            1
+          ) /
+          2;
+
+        return (
+          lowest +
+          range *
+            progress
         );
+      }
 
-      const ripple =
-        (
-          Math.cos(
-            distance *
-              Math.PI
-          ) +
-          1
-        ) / 2;
+      // ==================================================
+      // CHECKERBOARD
+      // ==================================================
+      case "checkerboard": {
+        const isHigh =
+          (
+            rowIndex +
+            colIndex
+          ) %
+            2 ===
+          0;
 
-      return (
-        lowest +
-        range * ripple
-      );
+        return isHigh
+          ? highest
+          : lowest;
+      }
+
+      // ==================================================
+      // RANDOM HEIGHT
+      // ==================================================
+      case "random": {
+        const seed =
+          Math.sin(
+            rowIndex *
+              12.9898 +
+            colIndex *
+              78.233
+          ) *
+          43758.5453;
+
+        const randomValue =
+          seed -
+          Math.floor(
+            seed
+          );
+
+        return (
+          lowest +
+          range *
+            randomValue
+        );
+      }
+
+      // ==================================================
+      // FALLBACK
+      // ==================================================
+      default:
+        return lowest;
     }
-
-
-    // ==================================================
-// SPIRAL
-// Smooth spiral with no sudden height jump
-// ==================================================
-case "spiral": {
-  const centerRow =
-    (rows - 1) / 2;
-
-  const centerCol =
-    (cols - 1) / 2;
-
-  const rowOffset =
-    rowIndex - centerRow;
-
-  const colOffset =
-    colIndex - centerCol;
-
-  const angle =
-    Math.atan2(
-      rowOffset,
-      colOffset
-    );
-
-  const distance =
-    Math.sqrt(
-      rowOffset * rowOffset +
-      colOffset * colOffset
-    );
-
-  const maxRadius =
-    Math.sqrt(
-      centerRow * centerRow +
-      centerCol * centerCol
-    );
-
-  const normalizedRadius =
-    maxRadius > 0
-      ? distance / maxRadius
-      : 0;
-
-  // Controls how tightly the spiral winds
-  const spiralTurns = 2;
-
-  const phase =
-    angle +
-    normalizedRadius *
-      Math.PI *
-      2 *
-      spiralTurns;
-
-  // Smooth 0 → 1 transition
-  const progress =
-    (
-      Math.sin(phase) +
-      1
-    ) / 2;
-
-  return (
-    lowest +
-    range * progress
-  );
-}
-
-
-    // ==================================================
-    // CHECKERBOARD
-    // ==================================================
-    case "checkerboard": {
-      const isHigh =
-        (
-          rowIndex +
-          colIndex
-        ) % 2 === 0;
-
-      return isHigh
-        ? highest
-        : lowest;
-    }
-
-
-    // ==================================================
-    // RANDOM
-    // Deterministic random:
-    // same grid position keeps same height
-    // ==================================================
-    case "random": {
-      const seed =
-        Math.sin(
-          rowIndex *
-            12.9898 +
-          colIndex *
-            78.233
-        ) *
-        43758.5453;
-
-      const randomValue =
-        seed -
-        Math.floor(seed);
-
-      return (
-        lowest +
-        range *
-          randomValue
-      );
-    }
-
-
-    // ==================================================
-    // FALLBACK
-    // ==================================================
-    default:
-      return lowest;
   }
-}
 
   // =====================================================
-  // SYNC PENDANT GRID USING OBJECT REUSE
-  // Only add/remove the difference.
+  // APPLY PENDANT ROTATION
+  // =====================================================
+  function applyPendantRotation({
+    pendant,
+    x,
+    z,
+    rowIndex,
+    colIndex,
+    rotationPattern = "default",
+  }) {
+    const baseQuaternion =
+      pendantBaseQuaternionRef.current;
+
+    if (
+      !pendant ||
+      !baseQuaternion
+    ) {
+      return;
+    }
+
+    // Always start with original GLB rotation
+    pendant.quaternion.copy(
+      baseQuaternion
+    );
+
+    switch (
+      rotationPattern
+    ) {
+      // ---------------------------------
+      // DEFAULT / RANDOM
+      // ---------------------------------
+      case "default":
+      case "random": {
+        const seed =
+          Math.sin(
+            (rowIndex + 1) *
+              12.9898 +
+            (colIndex + 1) *
+              78.233
+          ) *
+          43758.5453;
+
+        const randomValue =
+          seed -
+          Math.floor(
+            seed
+          );
+
+        const angle =
+          randomValue *
+          Math.PI *
+          2;
+
+        const rotationQuaternion =
+          new THREE.Quaternion()
+            .setFromAxisAngle(
+              new THREE.Vector3(
+                0,
+                1,
+                0
+              ),
+              angle
+            );
+
+        pendant.quaternion
+          .copy(
+            rotationQuaternion
+          )
+          .multiply(
+            baseQuaternion
+          );
+
+        return;
+      }
+
+      // ---------------------------------
+      // RADIAL
+      // ---------------------------------
+      case "radial": {
+        if (
+          x === 0 &&
+          z === 0
+        ) {
+          return;
+        }
+
+        const angle =
+          Math.atan2(
+            x,
+            z
+          );
+
+        const rotationQuaternion =
+          new THREE.Quaternion()
+            .setFromAxisAngle(
+              new THREE.Vector3(
+                0,
+                1,
+                0
+              ),
+              angle
+            );
+
+        pendant.quaternion
+          .copy(
+            rotationQuaternion
+          )
+          .multiply(
+            baseQuaternion
+          );
+
+        return;
+      }
+
+      // ---------------------------------
+      // ORIGINAL
+      // ---------------------------------
+      case "original":
+        return;
+
+      default:
+        return;
+    }
+  }
+
+  // =====================================================
+  // SYNC PENDANT GRID
+  // Object pooling + circle clipping
   // =====================================================
   function rebuildPendantGrid() {
     const scene =
@@ -1121,16 +1460,25 @@ case "spiral": {
       return;
     }
 
-const {
-  rows,
-  cols,
-  spacingL,
-  spacingW,
-  lowest,
-  highest = lowest,
-  pattern = "flat",
-} =
-  compositionConfigRef.current;
+    const {
+      rows,
+      cols,
+      spacingL,
+      spacingW,
+
+      lowest,
+      highest = lowest,
+
+      pattern = "flat",
+
+      rotationPattern =
+        "default",
+
+      surfaceWidth,
+      surfaceLength,
+      baseOffset,
+    } =
+      compositionConfigRef.current;
 
     const safeRows =
       Math.max(
@@ -1144,18 +1492,118 @@ const {
         Math.floor(cols)
       );
 
-    const requiredCount =
-      safeRows * safeCols;
+    // =====================================================
+    // BUILD VALID GRID POSITIONS
+    // =====================================================
+    const positions =
+      [];
 
-    // Add only missing pendant/cable pairs.
+    const autoLength =
+      (safeRows - 1) *
+        spacingL +
+      baseOffset;
+
+    const autoWidth =
+      (safeCols - 1) *
+        spacingW +
+      baseOffset;
+
+    const resolvedLength =
+      surfaceLength > 0
+        ? surfaceLength
+        : autoLength;
+
+    const resolvedWidth =
+      surfaceWidth > 0
+        ? surfaceWidth
+        : autoWidth;
+
+    const circleDiameter =
+      Math.min(
+        resolvedWidth,
+        resolvedLength
+      );
+
+    const circleRadius =
+      circleDiameter / 2;
+
+    for (
+      let rowIndex = 0;
+      rowIndex <
+      safeRows;
+      rowIndex++
+    ) {
+      for (
+        let colIndex = 0;
+        colIndex <
+        safeCols;
+        colIndex++
+      ) {
+        const x =
+          (
+            colIndex -
+            (safeCols - 1) /
+              2
+          ) *
+          spacingW;
+
+        const z =
+          (
+            rowIndex -
+            (safeRows - 1) /
+              2
+          ) *
+          spacingL;
+
+        // ---------------------------
+        // CIRCLE CLIPPING
+        // ---------------------------
+        if (
+          workingModel.surfaceShape ===
+          "circle"
+        ) {
+          const distanceFromCenter =
+            Math.sqrt(
+              x * x +
+              z * z
+            );
+
+          if (
+            distanceFromCenter >
+            circleRadius
+          ) {
+            continue;
+          }
+        }
+
+        positions.push({
+          rowIndex,
+          colIndex,
+          x,
+          z,
+        });
+      }
+    }
+
+    const requiredCount =
+      positions.length;
+
+    // =====================================================
+    // ADD ONLY MISSING OBJECTS
+    // =====================================================
     while (
-      pendantRefs.current.length <
+      pendantRefs.current
+        .length <
       requiredCount
     ) {
       const pendant =
-        template.clone(true);
+        template.clone(
+          true
+        );
 
-      scene.add(pendant);
+      scene.add(
+        pendant
+      );
 
       pendantRefs.current.push(
         pendant
@@ -1167,80 +1615,94 @@ const {
           cableMaterialRef.current
         );
 
-      scene.add(cable);
+      scene.add(
+        cable
+      );
 
       cableRefs.current.push(
         cable
       );
     }
 
-    // Remove only extra pendant/cable pairs.
+    // =====================================================
+    // REMOVE ONLY EXTRA OBJECTS
+    // =====================================================
     while (
-      pendantRefs.current.length >
+      pendantRefs.current
+        .length >
       requiredCount
     ) {
       const pendant =
         pendantRefs.current.pop();
 
       if (pendant) {
-        scene.remove(pendant);
+        scene.remove(
+          pendant
+        );
       }
 
       const cable =
         cableRefs.current.pop();
 
       if (cable) {
-        scene.remove(cable);
+        scene.remove(
+          cable
+        );
       }
     }
 
-    // Reposition the objects that already exist.
+    // =====================================================
+    // POSITION ACTIVE PENDANTS
+    // =====================================================
     for (
       let index = 0;
-      index < requiredCount;
+      index <
+      requiredCount;
       index++
     ) {
-      const rowIndex =
-        Math.floor(
-          index / safeCols
-        );
+      const {
+        rowIndex,
+        colIndex,
+        x,
+        z,
+      } =
+        positions[index];
 
-      const colIndex =
-        index % safeCols;
-
-      const x =
-        (
-          colIndex -
-          (safeCols - 1) / 2
-        ) * spacingW;
-
-      const z =
-        (
-          rowIndex -
-          (safeRows - 1) / 2
-        ) * spacingL;
-
-        const y =
-  calculatePendantHeight({
-    rowIndex,
-    colIndex,
-    rows: safeRows,
-    cols: safeCols,
-    pattern,
-    lowest,
-    highest,
-  });
+      const y =
+        calculatePendantHeight({
+          rowIndex,
+          colIndex,
+          rows:
+            safeRows,
+          cols:
+            safeCols,
+          pattern,
+          lowest,
+          highest,
+        });
 
       const pendant =
-        pendantRefs.current[index];
+        pendantRefs.current[
+          index
+        ];
 
-pendant.position.set(
-  x,
-  y,
-  z
-);
+      pendant.position.set(
+        x,
+        y,
+        z
+      );
+
+      applyPendantRotation({
+        pendant,
+        x,
+        z,
+        rowIndex,
+        colIndex,
+        rotationPattern,
+      });
     }
 
+    // Update cables after all transforms
     updateAllCables();
   }
 
