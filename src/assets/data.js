@@ -9,7 +9,7 @@ const modelList = [
     },
 
     images: [
-      "/pendant/GL012A/GL012A.jpg",
+      "pendant/GL012A/GL012A.jpg",
       "/pendant/GL012A/GL012A-2.jpg",
     ],
 

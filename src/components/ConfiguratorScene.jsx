@@ -601,12 +601,16 @@ cameraRef.current =
       return;
     }
 
-    const modelPath =
-      selectedModel.models?.[
-        workingModel.color
-      ] ??
-      selectedModel.models
-        ?.default;
+const rawModelPath =
+  selectedModel.models?.[
+    workingModel.color
+  ] ??
+  selectedModel.models
+    ?.default;
+
+const modelPath = rawModelPath
+  ? `${import.meta.env.BASE_URL}${rawModelPath.replace(/^\/+/, "")}`
+  : null;
 
     console.log(
       "Selected ID:",

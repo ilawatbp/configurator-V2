@@ -9,7 +9,7 @@ import { ConfiguratorProvider } from "./context/ConfiguratorContext.jsx";
 
 createRoot(document.getElementById("root")).render(
   <StrictMode>
-    <BrowserRouter>
+    <BrowserRouter basename="/configurator-V2">
       <ConfiguratorProvider >
         <App />
       </ConfiguratorProvider >
