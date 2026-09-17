@@ -1,6 +1,12 @@
 import { useEffect } from "react";
+
 import { createPortal } from "react-dom";
-import {  X,  Printer } from "lucide-react";
+
+import {
+  X,
+  Printer,
+  Download,
+} from "lucide-react";
 
 import { useReportData } from "./useReportData";
 import HolePlacementDrawing from "./HolePlacementDrawing";
@@ -20,6 +26,8 @@ function formatGeneratedDate(value) {
 export default function ReportModal({
   isOpen,
   onClose,
+  snapshotImage,
+  onDownload3D,
 }) {
   const reportData =
     useReportData();
@@ -27,8 +35,10 @@ export default function ReportModal({
   const firstPendant =
     reportData.pendants[0];
 
-  // Lock the configurator page while
-  // the report popup is open.
+
+  // =====================================================
+  // LOCK CONFIGURATOR PAGE WHILE REPORT IS OPEN
+  // =====================================================
   useEffect(() => {
     if (!isOpen) {
       return;
@@ -40,16 +50,19 @@ export default function ReportModal({
     document.body.style.overflow =
       "hidden";
 
+
     function handleKeyDown(event) {
       if (event.key === "Escape") {
         onClose();
       }
     }
 
+
     window.addEventListener(
       "keydown",
       handleKeyDown
     );
+
 
     return () => {
       document.body.style.overflow =
@@ -60,70 +73,237 @@ export default function ReportModal({
         handleKeyDown
       );
     };
-  }, [isOpen, onClose]);
+  }, [
+    isOpen,
+    onClose,
+  ]);
+
 
   if (!isOpen) {
     return null;
   }
 
+
   return createPortal(
     <div
-      className="fixed inset-0 z-[100] bg-gray-900/60 backdrop-blur-sm"
+      className="
+        fixed inset-0
+        z-[100]
+        bg-gray-900/60
+        backdrop-blur-sm
+      "
       id="configuration-report-modal"
       role="dialog"
       aria-modal="true"
       aria-label="Generated configuration report"
     >
-      <div className="flex h-dvh flex-col bg-gray-100">
-        {/* Modal header */}
-        <header className="report-modal-header flex shrink-0 items-center justify-between border-b border-gray-300 bg-white px-4 py-3 shadow-sm md:px-6">
+      <div
+        className="
+          flex h-dvh flex-col
+          bg-gray-100
+        "
+      >
+
+        {/* ================================================= */}
+        {/* MODAL HEADER */}
+        {/* ================================================= */}
+        <header
+          className="
+            report-modal-header
+            flex shrink-0
+            items-center
+            justify-between
+            border-b
+            border-gray-300
+            bg-white
+            px-4 py-3
+            shadow-sm
+            md:px-6
+          "
+        >
           <div>
-            <h1 className="text-lg font-semibold text-gray-900">
+            <h1
+              className="
+                text-lg
+                font-semibold
+                text-gray-900
+              "
+            >
               Configuration Report
             </h1>
 
-            <p className="text-xs text-gray-500">
+            <p
+              className="
+                text-xs
+                text-gray-500
+              "
+            >
               Review the current configuration before printing.
             </p>
           </div>
 
-          
 
-<div className="flex items-center gap-2">
-  <button
-    type="button"
-    onClick={() =>
-      window.print()
-    }
-    className="inline-flex items-center gap-2 rounded-lg bg-gray-900 px-3 py-2 text-sm font-medium text-white transition hover:bg-gray-700"
-  >
-    <Printer className="h-4 w-4" />
-    Print / Save PDF
-  </button>
+          {/* ================================================= */}
+          {/* REPORT ACTIONS */}
+          {/* ================================================= */}
+          <div
+            className="
+              flex items-center
+              gap-2
+            "
+          >
 
-  <button
-    type="button"
-    onClick={onClose}
-    className="inline-flex items-center gap-2 rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm font-medium text-gray-700 transition hover:bg-gray-100"
-  >
-    <X className="h-4 w-4" />
-    Close
-  </button>
-</div>
+            {/* DOWNLOAD 3D */}
+            <button
+              type="button"
+              onClick={onDownload3D}
+              disabled={!onDownload3D}
+              className="
+                inline-flex
+                items-center
+                gap-2
+                rounded-lg
+                border
+                border-gray-300
+                bg-white
+                px-3 py-2
+                text-sm
+                font-medium
+                text-gray-700
+                transition
+                hover:bg-gray-100
+                disabled:cursor-not-allowed
+                disabled:opacity-50
+              "
+            >
+              <Download
+                className="
+                  h-4 w-4
+                "
+              />
 
+              Download 3D
+            </button>
+
+
+            {/* PRINT / SAVE PDF */}
+            <button
+              type="button"
+              onClick={() =>
+                window.print()
+              }
+              className="
+                inline-flex
+                items-center
+                gap-2
+                rounded-lg
+                bg-gray-900
+                px-3 py-2
+                text-sm
+                font-medium
+                text-white
+                transition
+                hover:bg-gray-700
+              "
+            >
+              <Printer
+                className="
+                  h-4 w-4
+                "
+              />
+
+              Print / Save PDF
+            </button>
+
+
+            {/* CLOSE */}
+            <button
+              type="button"
+              onClick={onClose}
+              className="
+                inline-flex
+                items-center
+                gap-2
+                rounded-lg
+                border
+                border-gray-300
+                bg-white
+                px-3 py-2
+                text-sm
+                font-medium
+                text-gray-700
+                transition
+                hover:bg-gray-100
+              "
+            >
+              <X
+                className="
+                  h-4 w-4
+                "
+              />
+
+              Close
+            </button>
+          </div>
         </header>
 
-        {/* Scrollable report */}
-        <main className="report-modal-content flex-1 overflow-y-auto p-4 md:p-8">
-          <div className="report-container mx-auto max-w-6xl space-y-6">
-            {/* Report summary */}
-            <section className="rounded-xl bg-white p-6 shadow-sm">
-              <div className="border-b border-gray-200 pb-4">
-                <h2 className="text-2xl font-bold text-gray-900">
+
+        {/* ================================================= */}
+        {/* SCROLLABLE REPORT */}
+        {/* ================================================= */}
+        <main
+          className="
+            report-modal-content
+            flex-1
+            overflow-y-auto
+            p-4
+            md:p-8
+          "
+        >
+          <div
+            className="
+              report-container
+              mx-auto
+              max-w-6xl
+              space-y-6
+            "
+          >
+
+            {/* ================================================= */}
+            {/* REPORT SUMMARY */}
+            {/* ================================================= */}
+            <section
+              className="
+                rounded-xl
+                bg-white
+                p-6
+                shadow-sm
+              "
+            >
+              <div
+                className="
+                  border-b
+                  border-gray-200
+                  pb-4
+                "
+              >
+                <h2
+                  className="
+                    text-2xl
+                    font-bold
+                    text-gray-900
+                  "
+                >
                   Pendant Configuration Report
                 </h2>
 
-                <p className="mt-1 text-sm text-gray-500">
+                <p
+                  className="
+                    mt-1
+                    text-sm
+                    text-gray-500
+                  "
+                >
                   Generated:{" "}
                   {formatGeneratedDate(
                     reportData.report.generatedAt
@@ -131,13 +311,38 @@ export default function ReportModal({
                 </p>
               </div>
 
-              <div className="mt-5 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+
+              <div
+                className="
+                  mt-5
+                  grid
+                  gap-4
+                  sm:grid-cols-2
+                  lg:grid-cols-4
+                "
+              >
+
+                {/* MODEL */}
                 <div>
-                  <p className="text-xs font-medium uppercase tracking-wide text-gray-500">
+                  <p
+                    className="
+                      text-xs
+                      font-medium
+                      uppercase
+                      tracking-wide
+                      text-gray-500
+                    "
+                  >
                     Model
                   </p>
 
-                  <p className="mt-1 font-medium text-gray-900">
+                  <p
+                    className="
+                      mt-1
+                      font-medium
+                      text-gray-900
+                    "
+                  >
                     {firstPendant?.product
                       ?.modelName ??
                       firstPendant?.product
@@ -146,52 +351,175 @@ export default function ReportModal({
                   </p>
                 </div>
 
+
+                {/* COLOR */}
                 <div>
-                  <p className="text-xs font-medium uppercase tracking-wide text-gray-500">
+                  <p
+                    className="
+                      text-xs
+                      font-medium
+                      uppercase
+                      tracking-wide
+                      text-gray-500
+                    "
+                  >
                     Color
                   </p>
 
-                  <p className="mt-1 font-medium capitalize text-gray-900">
+                  <p
+                    className="
+                      mt-1
+                      font-medium
+                      capitalize
+                      text-gray-900
+                    "
+                  >
                     {firstPendant?.product
                       ?.color ||
                       "Not selected"}
                   </p>
                 </div>
 
+
+                {/* BASEPLATE */}
                 <div>
-                  <p className="text-xs font-medium uppercase tracking-wide text-gray-500">
+                  <p
+                    className="
+                      text-xs
+                      font-medium
+                      uppercase
+                      tracking-wide
+                      text-gray-500
+                    "
+                  >
                     Baseplate Shape
                   </p>
 
-                  <p className="mt-1 font-medium capitalize text-gray-900">
+                  <p
+                    className="
+                      mt-1
+                      font-medium
+                      capitalize
+                      text-gray-900
+                    "
+                  >
                     {reportData.baseplate
                       .shape ||
                       "Not selected"}
                   </p>
                 </div>
 
+
+                {/* PENDANT COUNT */}
                 <div>
-                  <p className="text-xs font-medium uppercase tracking-wide text-gray-500">
+                  <p
+                    className="
+                      text-xs
+                      font-medium
+                      uppercase
+                      tracking-wide
+                      text-gray-500
+                    "
+                  >
                     Number of Pendants
                   </p>
 
-                  <p className="mt-1 font-medium text-gray-900">
+                  <p
+                    className="
+                      mt-1
+                      font-medium
+                      text-gray-900
+                    "
+                  >
                     {
                       reportData.pendants
                         .length
                     }
                   </p>
                 </div>
+
               </div>
             </section>
 
-            {/* Hole-placement report */}
+
+            {/* ================================================= */}
+            {/* 3D CONFIGURATION SNAPSHOT */}
+            {/* ================================================= */}
+            {snapshotImage && (
+              <section
+                className="
+                  rounded-xl
+                  bg-white
+                  p-6
+                  shadow-sm
+                "
+              >
+                <div
+                  className="
+                    border-b
+                    border-gray-200
+                    pb-4
+                  "
+                >
+                  <h2
+                    className="
+                      text-lg
+                      font-semibold
+                      text-gray-900
+                    "
+                  >
+                    3D Configuration
+                  </h2>
+
+                  <p
+                    className="
+                      mt-1
+                      text-sm
+                      text-gray-500
+                    "
+                  >
+                    Preview of the generated pendant composition.
+                  </p>
+                </div>
+
+
+                <div
+                  className="
+                    mt-5
+                    overflow-hidden
+                    rounded-lg
+                    border
+                    border-gray-200
+                    bg-gray-50
+                  "
+                >
+                  <img
+                    src={snapshotImage}
+                    alt="3D pendant configuration"
+                    className="
+                      block
+                      h-auto
+                      max-h-[650px]
+                      w-full
+                      object-contain
+                    "
+                  />
+                </div>
+              </section>
+            )}
+
+
+            {/* ================================================= */}
+            {/* HOLE PLACEMENT REPORT */}
+            {/* ================================================= */}
             <HolePlacementDrawing
               reportData={reportData}
               unit="cm"
             />
+
           </div>
         </main>
+
       </div>
     </div>,
 

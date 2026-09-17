@@ -1,10 +1,12 @@
-import { useContext, useEffect, useRef } from "react";
+import {  useContext,  useEffect,  useRef,  forwardRef,  useImperativeHandle,} from "react";
 import * as THREE from "three";
 import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
 import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js";
 
 import { ConfiguratorContext } from "../context/ConfiguratorContext";
 import modelList from "../assets/data";
+
+import { GLTFExporter }  from "three/examples/jsm/exporters/GLTFExporter.js";
 
 import { calculateMountingLayout } from "../utils/calculateMountingLayout";
 
@@ -32,7 +34,9 @@ function disposeObject(object) {
   });
 }
 
-export default function ConfiguratorScene() {
+const ConfiguratorScene = forwardRef(
+  function ConfiguratorScene(props, ref) {
+
   const containerRef = useRef(null);
 
 const {
@@ -56,6 +60,9 @@ const {
   // Camera / controls references
 const cameraRef = useRef(null);
 const controlsRef = useRef(null);
+
+const rendererRef = useRef(null);
+const gridRef = useRef(null);
 
 const cameraTransitionRef = useRef({
   active: false,
@@ -169,7 +176,11 @@ const cameraTransitionRef = useRef({
     const renderer =
       new THREE.WebGLRenderer({
         antialias: true,
+        preserveDrawingBuffer: true,
       });
+
+    rendererRef.current = renderer;
+
 
     renderer.setSize(
       container.clientWidth,
@@ -224,6 +235,8 @@ const cameraTransitionRef = useRef({
         1000,
         50
       );
+
+      gridRef.current = grid;
 
     grid.material.transparent =
       true;
@@ -372,76 +385,95 @@ function animate() {
     // ---------------------------
     // CLEANUP
     // ---------------------------
-    return () => {
-      cancelAnimationFrame(
-        animationFrame
-      );
 
-      window.removeEventListener(
-        "resize",
-        handleResize
-      );
+return () => {
+  cancelAnimationFrame(
+    animationFrame
+  );
 
-      controls.removeEventListener(
-  "start",
-  handleControlsStart
-);
+  window.removeEventListener(
+    "resize",
+    handleResize
+  );
 
-      controls.dispose();
+  controls.removeEventListener(
+    "start",
+    handleControlsStart
+  );
 
-      controlsRef.current =
-  null;
+  controls.dispose();
 
-cameraRef.current =
-  null;
+  controlsRef.current =
+    null;
 
-      grid.geometry?.dispose();
-      grid.material?.dispose();
+  cameraRef.current =
+    null;
 
-      cableGeometryRef.current?.dispose();
-      cableMaterialRef.current?.dispose();
+  // ---------------------------
+  // GRID CLEANUP
+  // ---------------------------
+  grid.geometry?.dispose();
+  grid.material?.dispose();
 
-      cableGeometryRef.current =
-        null;
+  gridRef.current =
+    null;
 
-      cableMaterialRef.current =
-        null;
+  // ---------------------------
+  // CABLE RESOURCES
+  // ---------------------------
+  cableGeometryRef.current?.dispose();
+  cableMaterialRef.current?.dispose();
 
-      if (
-        baseplateRef.current
-      ) {
-        scene.remove(
-          baseplateRef.current
-        );
+  cableGeometryRef.current =
+    null;
 
-        baseplateRef.current
-          .geometry
-          ?.dispose();
+  cableMaterialRef.current =
+    null;
 
-        baseplateRef.current
-          .material
-          ?.dispose();
+  // ---------------------------
+  // BASEPLATE
+  // ---------------------------
+  if (
+    baseplateRef.current
+  ) {
+    scene.remove(
+      baseplateRef.current
+    );
 
-        baseplateRef.current =
-          null;
-      }
+    baseplateRef.current
+      .geometry
+      ?.dispose();
 
-      renderer.dispose();
+    baseplateRef.current
+      .material
+      ?.dispose();
 
-      if (
+    baseplateRef.current =
+      null;
+  }
+
+  // ---------------------------
+  // RENDERER CLEANUP
+  // ---------------------------
+  renderer.dispose();
+
+  rendererRef.current =
+    null;
+
+  if (
+    renderer.domElement
+      .parentNode
+  ) {
+    renderer.domElement
+      .parentNode
+      .removeChild(
         renderer.domElement
-          .parentNode
-      ) {
-        renderer.domElement
-          .parentNode
-          .removeChild(
-            renderer.domElement
-          );
-      }
+      );
+  }
 
-      sceneRef.current =
-        null;
-    };
+  sceneRef.current =
+    null;
+};
   }, []);
 
   // =====================================================
@@ -2335,6 +2367,238 @@ const y =
     // Update cables after all transforms
     updateAllCables();
   }
+  // =====================================================
+// CAPTURE 3D SNAPSHOT
+// =====================================================
+function captureSnapshot() {
+  const renderer =
+    rendererRef.current;
+
+  const scene =
+    sceneRef.current;
+
+  const camera =
+    cameraRef.current;
+
+  if (
+    !renderer ||
+    !scene ||
+    !camera
+  ) {
+    return null;
+  }
+
+  const grid =
+    gridRef.current;
+
+  const previousGridVisibility =
+    grid?.visible ?? true;
+
+  // Hide helper grid from report image
+  if (grid) {
+    grid.visible = false;
+  }
+
+  // Force fresh render
+  renderer.render(
+    scene,
+    camera
+  );
+
+  const imageData =
+    renderer.domElement.toDataURL(
+      "image/png"
+    );
+
+  // Restore normal configurator view
+  if (grid) {
+    grid.visible =
+      previousGridVisibility;
+  }
+
+  renderer.render(
+    scene,
+    camera
+  );
+
+  return imageData;
+}
+
+
+// =====================================================
+// DOWNLOAD 3D SNAPSHOT
+// =====================================================
+function downloadSnapshot(
+  filename =
+    "lighting-configurator.png"
+) {
+  const imageData =
+    captureSnapshot();
+
+  if (!imageData) {
+    console.error(
+      "Unable to capture 3D snapshot."
+    );
+
+    return;
+  }
+
+  const link =
+    document.createElement("a");
+
+  link.href =
+    imageData;
+
+  link.download =
+    filename;
+
+  link.click();
+}
+
+// =====================================================
+// BUILD 3D EXPORT GROUP
+// =====================================================
+function buildExportGroup() {
+  const exportGroup =
+    new THREE.Group();
+
+  exportGroup.name =
+    "LightingConfigurator";
+
+  // -----------------------------
+  // BASEPLATE
+  // -----------------------------
+  if (baseplateRef.current) {
+    exportGroup.add(
+      baseplateRef.current.clone(
+        true
+      )
+    );
+  }
+
+  // -----------------------------
+  // PENDANTS
+  // -----------------------------
+  pendantRefs.current.forEach(
+    (pendant) => {
+      if (!pendant) return;
+
+      exportGroup.add(
+        pendant.clone(true)
+      );
+    }
+  );
+
+  // -----------------------------
+  // CABLES
+  // -----------------------------
+  cableRefs.current.forEach(
+    (cable) => {
+      if (!cable) return;
+
+      exportGroup.add(
+        cable.clone(true)
+      );
+    }
+  );
+
+  // Configurator dimensions are
+  // currently effectively centimeters.
+  //
+  // GLTF / GLB expects meter-based scale.
+  const EXPORT_SCALE =
+    0.01;
+
+  exportGroup.scale.setScalar(
+    EXPORT_SCALE
+  );
+
+  exportGroup.updateMatrixWorld(
+    true
+  );
+
+  return exportGroup;
+}
+
+
+// =====================================================
+// EXPORT CONFIGURATION AS GLB
+// =====================================================
+async function exportGLB(
+  filename =
+    "lighting-configurator.glb"
+) {
+  try {
+    const exportGroup =
+      buildExportGroup();
+
+    const exporter =
+      new GLTFExporter();
+
+    const result =
+      await exporter.parseAsync(
+        exportGroup,
+        {
+          binary: true,
+          onlyVisible: true,
+        }
+      );
+
+    const blob =
+      new Blob(
+        [result],
+        {
+          type:
+            "model/gltf-binary",
+        }
+      );
+
+    const url =
+      URL.createObjectURL(
+        blob
+      );
+
+    const link =
+      document.createElement(
+        "a"
+      );
+
+    link.href =
+      url;
+
+    link.download =
+      filename;
+
+    document.body.appendChild(
+      link
+    );
+
+    link.click();
+
+    link.remove();
+
+    URL.revokeObjectURL(
+      url
+    );
+  } catch (error) {
+    console.error(
+      "GLB export failed:",
+      error
+    );
+  }
+}
+
+// =====================================================
+// EXPOSE SCENE FUNCTIONS TO PARENT COMPONENT
+// =====================================================
+useImperativeHandle(
+  ref,
+  () => ({
+    captureSnapshot,
+    downloadSnapshot,
+    exportGLB,
+  })
+);
 
   return (
     <div
@@ -2343,3 +2607,6 @@ const y =
     />
   );
 }
+)
+
+export default ConfiguratorScene;

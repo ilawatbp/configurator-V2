@@ -4,13 +4,17 @@ import {
   FileText,
 } from "lucide-react";
 
-import { useState } from "react";
+import {
+  useState,
+} from "react";
 
 import ReportModal from "../report/ReportModal";
 import CompositionPanel from "./CompositionPanel";
 
 
-export default function Sidebar() {
+export default function Sidebar({
+  sceneRef,
+}) {
   const [isOpen, setIsOpen] =
     useState(false);
 
@@ -19,11 +23,41 @@ export default function Sidebar() {
     setIsReportOpen,
   ] = useState(false);
 
+  const [
+    reportSnapshot,
+    setReportSnapshot,
+  ] = useState(null);
+
 
   function toggleSidebar() {
     setIsOpen(
       (previous) => !previous
     );
+  }
+
+
+  // =====================================================
+  // GENERATE REPORT
+  // =====================================================
+  function handleGenerateReport() {
+    const snapshot =
+      sceneRef.current
+        ?.captureSnapshot();
+
+    setReportSnapshot(
+      snapshot ?? null
+    );
+
+    setIsReportOpen(true);
+  }
+
+
+  // =====================================================
+  // DOWNLOAD 3D
+  // =====================================================
+  function handleDownload3D() {
+    sceneRef.current
+      ?.exportGLB();
   }
 
 
@@ -88,6 +122,7 @@ export default function Sidebar() {
           )}
         </div>
 
+
         {/* SIDEBAR CONTENT */}
         <div
           className={`
@@ -113,11 +148,12 @@ export default function Sidebar() {
           <CompositionPanel />
         </div>
 
+
         {/* GENERATE REPORT */}
         <button
           type="button"
-          onClick={() =>
-            setIsReportOpen(true)
+          onClick={
+            handleGenerateReport
           }
           title={
             isOpen
@@ -154,10 +190,23 @@ export default function Sidebar() {
         </button>
       </aside>
 
+
+      {/* ================================================= */}
+      {/* REPORT MODAL */}
+      {/* ================================================= */}
       <ReportModal
         isOpen={isReportOpen}
+
         onClose={() =>
           setIsReportOpen(false)
+        }
+
+        snapshotImage={
+          reportSnapshot
+        }
+
+        onDownload3D={
+          handleDownload3D
         }
       />
     </>
