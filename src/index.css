@@ -1,1 +1,60 @@
 @import "tailwindcss";
+
+@media print {
+  @page {
+    size: A4 portrait;
+    margin: 10mm;
+  }
+
+  html,
+  body {
+    overflow: visible !important;
+    background: white !important;
+  }
+
+  body > * {
+    display: none !important;
+  }
+
+  body > #configuration-report-modal {
+    display: block !important;
+  }
+
+  #configuration-report-modal {
+    position: static !important;
+    inset: auto !important;
+    height: auto !important;
+    background: white !important;
+  }
+
+  #configuration-report-modal > div {
+    display: block !important;
+    height: auto !important;
+  }
+
+  .report-modal-header {
+    display: none !important;
+  }
+
+  .report-modal-content {
+    overflow: visible !important;
+    padding: 0 !important;
+  }
+
+  .report-container {
+    max-width: none !important;
+  }
+
+  table {
+    width: 100% !important;
+  }
+
+  thead {
+    display: table-header-group;
+  }
+
+  tr {
+    break-inside: avoid;
+    page-break-inside: avoid;
+  }
+}
