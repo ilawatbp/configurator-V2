@@ -1,9 +1,20 @@
-import { createContext, useState } from "react";
+import {
+  createContext,
+  useState,
+} from "react";
 
-export const ConfiguratorContext = createContext();
 
-export function ConfiguratorProvider({ children }) {
-  const [workingModel, setWorkingModel] = useState({
+export const ConfiguratorContext =
+  createContext();
+
+
+export function ConfiguratorProvider({
+  children,
+}) {
+  const [
+    workingModel,
+    setWorkingModel,
+  ] = useState({
     id: "",
     color: "",
     fitting: "",
@@ -13,7 +24,10 @@ export function ConfiguratorProvider({ children }) {
     surfaceShape: "",
   });
 
-  const [compositionConfig, setCompositionConfig] = useState({
+  const [
+    compositionConfig,
+    setCompositionConfig,
+  ] = useState({
     rows: 9,
     cols: 5,
     pattern: "wave",
@@ -34,6 +48,17 @@ export function ConfiguratorProvider({ children }) {
     circleSegments: 96,
   });
 
+  // Actual calculated results from
+  // the Three.js composition.
+  const [
+    computedComposition,
+    setComputedComposition,
+  ] = useState({
+    baseplateBottomY: null,
+    pendants: [],
+  });
+
+
   return (
     <ConfiguratorContext.Provider
       value={{
@@ -42,6 +67,9 @@ export function ConfiguratorProvider({ children }) {
 
         compositionConfig,
         setCompositionConfig,
+
+        computedComposition,
+        setComputedComposition,
       }}
     >
       {children}

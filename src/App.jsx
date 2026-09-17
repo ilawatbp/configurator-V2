@@ -5,6 +5,7 @@ import StartPage from "./pages/StartPage";
 import Configuration3D from "./pages/Configuration3D";
 import MaterialSelection from "./pages/MaterialSelection";
 import PendantSelection from "./pages/PendantSelection";
+import HolePlacementPage from "./pages/HolePlacementPage";
 
 function App() {
 
@@ -16,6 +17,8 @@ function App() {
             <Route path="/penselect" element={<PendantSelection />} />
             <Route path="/matselect" element={<MaterialSelection />} />
             <Route path="/config" element={<Configuration3D />} />
+            <Route   path="/hole-placement"  element={<HolePlacementPage />}
+/>
           </Routes>
         </main>
       </div>

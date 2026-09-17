@@ -6,6 +6,8 @@ import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js";
 import { ConfiguratorContext } from "../context/ConfiguratorContext";
 import modelList from "../assets/data";
 
+import { calculateMountingLayout } from "../utils/calculateMountingLayout";
+
 function disposeObject(object) {
   object.traverse((child) => {
     if (!child.isMesh) return;
@@ -33,10 +35,13 @@ function disposeObject(object) {
 export default function ConfiguratorScene() {
   const containerRef = useRef(null);
 
-  const {
-    workingModel,
-    compositionConfig,
-  } = useContext(ConfiguratorContext);
+const {
+  workingModel,
+  compositionConfig,
+  setComputedComposition,
+} = useContext(
+  ConfiguratorContext
+);
 
   // Keep latest config available to async callbacks.
   const compositionConfigRef =
@@ -972,96 +977,145 @@ useEffect(() => {
   // No cable recreation
   // =====================================================
   function updateAllCables() {
-    const baseplate =
-      baseplateRef.current;
+  const baseplate =
+    baseplateRef.current;
 
-    const attachmentLocal =
-      pendantAttachmentLocalRef.current;
+  const attachmentLocal =
+    pendantAttachmentLocalRef.current;
 
-    if (
-      !baseplate ||
-      !attachmentLocal
-    ) {
-      return;
-    }
-
-    baseplate.updateMatrixWorld(
-      true
-    );
-
-    // Calculate baseplate bottom once
-    const baseplateBox =
-      new THREE.Box3()
-        .setFromObject(
-          baseplate
-        );
-
-    const baseplateBottomY =
-      baseplateBox.min.y;
-
-    // Reuse Vector3
-    const attachmentWorld =
-      new THREE.Vector3();
-
-    pendantRefs.current.forEach(
-      (
-        pendant,
-        index
-      ) => {
-        const cable =
-          cableRefs.current[
-            index
-          ];
-
-        if (!cable) {
-          return;
-        }
-
-        pendant.updateMatrixWorld(
-          true
-        );
-
-        attachmentWorld
-          .copy(
-            attachmentLocal
-          )
-          .applyMatrix4(
-            pendant.matrixWorld
-          );
-
-        const cableLength =
-          baseplateBottomY -
-          attachmentWorld.y;
-
-        if (
-          cableLength <= 0
-        ) {
-          cable.visible =
-            false;
-
-          return;
-        }
-
-        cable.visible =
-          true;
-
-        cable.scale.set(
-          1,
-          cableLength,
-          1
-        );
-
-        cable.position.set(
-          attachmentWorld.x,
-
-          attachmentWorld.y +
-            cableLength / 2,
-
-          attachmentWorld.z
-        );
-      }
-    );
+  if (
+    !baseplate ||
+    !attachmentLocal
+  ) {
+    return;
   }
+
+  baseplate.updateMatrixWorld(
+    true
+  );
+
+  // Calculate the bottom surface
+  // of the baseplate.
+  const baseplateBox =
+    new THREE.Box3()
+      .setFromObject(
+        baseplate
+      );
+
+  const baseplateBottomY =
+    baseplateBox.min.y;
+
+  const attachmentWorld =
+    new THREE.Vector3();
+
+  const computedPendants = [];
+
+  pendantRefs.current.forEach(
+    (
+      pendant,
+      index
+    ) => {
+      const cable =
+        cableRefs.current[
+          index
+        ];
+
+      if (!cable) {
+        return;
+      }
+
+      pendant.updateMatrixWorld(
+        true
+      );
+
+      // Convert the pendant's local
+      // attachment point into its
+      // actual scene position.
+      attachmentWorld
+        .copy(
+          attachmentLocal
+        )
+        .applyMatrix4(
+          pendant.matrixWorld
+        );
+
+      const cableLength =
+        baseplateBottomY -
+        attachmentWorld.y;
+
+      const safeCableLength =
+        Math.max(
+          cableLength,
+          0
+        );
+
+      // Save the exact values used
+      // by the rendered composition.
+      computedPendants.push({
+        id:
+          `pendant-${index + 1}`,
+
+        position: {
+          x:
+            pendant.position.x,
+
+          y:
+            pendant.position.y,
+
+          z:
+            pendant.position.z,
+        },
+
+        // Use the actual cable position.
+        // This accounts for any offset in
+        // the GLB attachment point.
+        mountingHole: {
+          x:
+            attachmentWorld.x,
+
+          z:
+            attachmentWorld.z,
+        },
+
+        cable: {
+          length:
+            safeCableLength,
+        },
+      });
+
+      if (cableLength <= 0) {
+        cable.visible =
+          false;
+
+        return;
+      }
+
+      cable.visible =
+        true;
+
+      cable.scale.set(
+        1,
+        cableLength,
+        1
+      );
+
+      cable.position.set(
+        attachmentWorld.x,
+
+        attachmentWorld.y +
+          cableLength / 2,
+
+        attachmentWorld.z
+      );
+    }
+  );
+
+  setComputedComposition({
+    baseplateBottomY,
+    pendants:
+      computedPendants,
+  });
+}
 
   // =====================================================
   // CALCULATE PENDANT HEIGHT
@@ -2129,267 +2183,24 @@ transition.active =
 // Circle:
 //   Center + concentric circular rings
 // =====================================================
-const positions = [];
 
 
+const { holes: positions } =
+  calculateMountingLayout({
+    surfaceShape:
+      workingModel.surfaceShape,
 
+    rows: safeRows,
+    cols: safeCols,
 
-// =====================================================
-// RECTANGLE POSITIONING
-// =====================================================
-if (
-  workingModel.surfaceShape !==
-  "circle"
-) {
-  for (
-    let rowIndex = 0;
-    rowIndex < safeRows;
-    rowIndex++
-  ) {
-    for (
-      let colIndex = 0;
-      colIndex < safeCols;
-      colIndex++
-    ) {
-      const x =
-        (
-          colIndex -
-          (safeCols - 1) / 2
-        ) * spacingW;
+    spacingL,
+    spacingW,
 
-      const z =
-        (
-          rowIndex -
-          (safeRows - 1) / 2
-        ) * spacingL;
+    surfaceWidth,
+    surfaceLength,
 
-      positions.push({
-        rowIndex,
-        colIndex,
-        x,
-        z,
-
-        ringIndex: null,
-        angle: null,
-        radialProgress: null,
-      });
-    }
-  }
-}
-
-
-// =====================================================
-// CIRCLE POSITIONING
-// =====================================================
-else {
-  const totalPendants =
-    safeRows * safeCols;
-
-  if (totalPendants > 0) {
-
-    // ---------------------------------
-    // Calculate baseplate diameter
-    // ---------------------------------
-    const autoLength =
-      (safeRows - 1) *
-        spacingL +
-      baseOffset;
-
-    const autoWidth =
-      (safeCols - 1) *
-        spacingW +
-      baseOffset;
-
-    const resolvedLength =
-      surfaceLength > 0
-        ? surfaceLength
-        : autoLength;
-
-    const resolvedWidth =
-      surfaceWidth > 0
-        ? surfaceWidth
-        : autoWidth;
-
-    const circleDiameter =
-      Math.min(
-        resolvedWidth,
-        resolvedLength
-      );
-
-    const circleRadius =
-      circleDiameter / 2;
-
-    // Keep pendant centers slightly
-    // away from the edge of the plate.
-    const edgePadding =
-      Math.max(
-        baseOffset / 2,
-        0
-      );
-
-    const usableRadius =
-      Math.max(
-        circleRadius -
-          edgePadding,
-        0
-      );
-
-
-    // ---------------------------------
-    // CENTER PENDANT
-    // ---------------------------------
-    positions.push({
-      rowIndex: 0,
-      colIndex: 0,
-
-      x: 0,
-      z: 0,
-
-      ringIndex: 0,
-      angle: 0,
-      radialProgress: 0,
-    });
-
-
-    let remaining =
-      totalPendants - 1;
-
-    // ---------------------------------
-    // Determine how many rings
-    // are required.
-    //
-    // Ring capacities:
-    //
-    // ring 1 = 6
-    // ring 2 = 12
-    // ring 3 = 18
-    // ring 4 = 24
-    // ...
-    // ---------------------------------
-    let ringCount = 0;
-    let testRemaining =
-      remaining;
-
-    while (
-      testRemaining > 0
-    ) {
-      ringCount++;
-
-      const capacity =
-        ringCount * 6;
-
-      testRemaining -=
-        capacity;
-    }
-
-
-    const ringSpacing =
-      ringCount > 0
-        ? usableRadius /
-          ringCount
-        : 0;
-
-
-    // ---------------------------------
-    // BUILD EACH RING
-    // ---------------------------------
-    let linearIndex = 1;
-
-    for (
-      let ringIndex = 1;
-      ringIndex <= ringCount;
-      ringIndex++
-    ) {
-      if (remaining <= 0) {
-        break;
-      }
-
-      const ringCapacity =
-        ringIndex * 6;
-
-      const pendantCount =
-        Math.min(
-          ringCapacity,
-          remaining
-        );
-
-      const radius =
-        ringSpacing *
-        ringIndex;
-
-      // Slightly rotate alternating rings.
-      // This avoids everything lining up
-      // like spokes.
-      const angleOffset =
-        ringIndex % 2 === 0
-          ? Math.PI /
-            pendantCount
-          : 0;
-
-      for (
-        let itemIndex = 0;
-        itemIndex <
-        pendantCount;
-        itemIndex++
-      ) {
-        const angle =
-          (
-            itemIndex /
-            pendantCount
-          ) *
-            Math.PI *
-            2 +
-          angleOffset;
-
-        const x =
-          Math.cos(angle) *
-          radius;
-
-        const z =
-          Math.sin(angle) *
-          radius;
-
-        // Keep compatible row/column
-        // indexes for your existing
-        // height-pattern engine.
-        const rowIndex =
-          Math.floor(
-            linearIndex /
-            safeCols
-          );
-
-        const colIndex =
-          linearIndex %
-          safeCols;
-
-        positions.push({
-          rowIndex,
-          colIndex,
-
-          x,
-          z,
-
-          // Save radial information
-          // for future circle-specific
-          // height patterns.
-          ringIndex,
-          angle,
-
-          radialProgress:
-            ringCount > 0
-              ? ringIndex /
-                ringCount
-              : 0,
-        });
-
-        linearIndex++;
-      }
-
-      remaining -=
-        pendantCount;
-    }
-  }
-}
+    baseOffset,
+  });
 
     const requiredCount =
       positions.length;
