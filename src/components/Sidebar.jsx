@@ -1,5 +1,5 @@
 import {
-  PanelRightOpen,
+  ArrowRightFromLine,
   X,
   FileText,
 } from "lucide-react";
@@ -106,7 +106,7 @@ export default function Sidebar({
               onClick={toggleSidebar}
               aria-label="Open sidebar"
             >
-              <PanelRightOpen className="h-5 w-5" />
+              <ArrowRightFromLine className="h-5 w-5" />
             </button>
           )}
 
