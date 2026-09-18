@@ -8,6 +8,7 @@ import modelList from "../assets/data";
 
 import { useContext } from "react";
 import { ConfiguratorContext } from "../context/ConfiguratorContext";
+import Header from "../components/Header";
 
 export default function PendantSelection() {
   const navigate = useNavigate();
@@ -22,6 +23,7 @@ export default function PendantSelection() {
 
   return (
     <div className=" w-full min-h-full px-6">
+      <Header></Header>
       <div className="h-24 flex items-center">
         <button
           onClick={() => {

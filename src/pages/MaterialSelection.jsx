@@ -5,6 +5,8 @@ import { useContext } from "react";
 import { ConfiguratorContext } from "../context/ConfiguratorContext";
 import modelList from "../assets/data";
 
+import Header from "../components/Header";
+
 export default function MaterialSelection() {
   const navigate = useNavigate();
 
@@ -21,6 +23,7 @@ export default function MaterialSelection() {
 
   return (
     <div className="w-full min-h-full px-6">
+      <Header />
       <div className="h-24 flex items-center">
         <button onClick={() => navigate(-1)}>
           <ArrowLeft />
