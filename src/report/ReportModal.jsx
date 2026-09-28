@@ -117,7 +117,6 @@ export default function ReportModal({
             border-gray-300
             bg-white
             px-4 py-3
-            shadow-sm
             md:px-6
           "
         >
@@ -266,6 +265,8 @@ export default function ReportModal({
               mx-auto
               max-w-6xl
               space-y-6
+              bg-white
+              rounded-xl
             "
           >
 
@@ -277,7 +278,6 @@ export default function ReportModal({
                 rounded-xl
                 bg-white
                 p-6
-                shadow-sm
               "
             >
               <div
@@ -451,7 +451,6 @@ export default function ReportModal({
                   rounded-xl
                   bg-white
                   p-6
-                  shadow-sm
                 "
               >
                 <div

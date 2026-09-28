@@ -58,3 +58,10 @@
     page-break-inside: avoid;
   }
 }
+
+
+@media print {
+  .report-card {
+    box-shadow: none !important;
+  }
+}
